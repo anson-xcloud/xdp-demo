@@ -6,11 +6,26 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sync"
 )
+
+type ServerInterface interface {
+	Ping() error
+
+	Serve() error
+
+	Write(*Session, io.Reader)
+}
+
+type Session struct {
+	Addr      string
+	OpenID    string
+	SessionID string
+}
 
 type Server struct {
 	mtx sync.Mutex
@@ -48,22 +63,15 @@ func (s *Server) Init() error {
 	return nil
 }
 
-func (s *Server) Write(p []byte) error {
-	// func (s *Server) Write(sess Session, p []byte) error {
-	// var dt DataTransfer
-	// dt.SessionID = sess.ID()
-	// dt.Data = p
-	// data, err := dt.Marshal()
-	// if err != nil {
-	// 	return err
-	// }
+func (s *Server) Write(sess *Session, reader io.Reader) error {
+	var data DataTransfer
+	data.SessionID = sess.SessionID
+	data.Data = reader
 
-	// var pk Packet
-	// pk.Cmd = CmdData
-	// pk.Length = uint32(len(p))
-	// pk.Data = data
-	// return s.cli.write(&pk)
-	return nil
+	var req Request
+	req.Cmd = 1
+	req.Body = reader
+	return s.conn.Push(&req)
 }
 
 func (s *Server) process() {
@@ -125,11 +133,15 @@ func (s *Server) handshake(ap *AccessPoint) error {
 	var reqbody HandshakeRequest
 	reqbody.AppID = s.AppID
 	reqbody.Key = ap.Key
+	body, err := reqbody.GetBody()
+	if err != nil {
+		return err
+	}
 
 	var req Request
 	req.Cmd = svrCmdHandshake
-	_, err := conn.Call(context.Background(), &req)
-	if err != nil {
+	req.Body = body
+	if _, err = conn.Call(context.Background(), &req); err != nil {
 		conn.Close()
 		return err
 	}

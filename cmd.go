@@ -1,7 +1,13 @@
 package xdp
 
+import (
+	"bytes"
+	"io"
+)
+
 const (
 	svrCmdHandshake = 1
+	svrCmdData      = 2
 )
 
 type HandshakeRequest struct {
@@ -9,21 +15,26 @@ type HandshakeRequest struct {
 	Key   string
 }
 
-func (r *HandshakeRequest) Marshal() ([]byte, error) {
-	// bb := bytes.NewBuffer(nil)
+func (r *HandshakeRequest) GetBody() (io.Reader, error) {
+	bb := bytes.NewBuffer(nil)
+	bb.WriteString(r.Key)
 	// if err := writeString(bb, r.Key); err != nil {
 	// 	return nil, err
 	// }
-	// return bb.Bytes(), nil
-	return nil, nil
+	return bb, nil
 }
 
-func (r *HandshakeRequest) Unmarshal(data []byte) error {
-	// var err error
-	// buf := bytes.NewBuffer(data)
+type DataTransfer struct {
+	SessionID string
+	OpenID    string
+	Data      io.Reader
+}
 
-	// if r.Key, err = readString(buf); err != nil {
-	// 	return err
+func (r *DataTransfer) GetBody() (io.Reader, error) {
+	bb := bytes.NewBuffer(nil)
+	bb.WriteString(r.SessionID)
+	// if err := writeString(bb, r.Key); err != nil {
+	// 	return nil, err
 	// }
-	return nil
+	return bb, nil
 }
