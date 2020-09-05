@@ -1,6 +1,7 @@
 package xdp
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -32,7 +33,7 @@ type Server struct {
 
 	conn *Connection
 
-	AppID, AppSecret string
+	AppID, AppSecret, Config string
 
 	handler Handler
 }
@@ -43,33 +44,38 @@ func NewServer() *Server {
 }
 
 func (s *Server) Serve() error {
-	if err := s.Init(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Server) Init() error {
 	ap, err := s.getAccessPoint()
 	if err != nil {
 		return err
 	}
 
-	err = s.handshake(ap)
-	if err != nil {
+	conn := newConnection("tcp", ap.Addr)
+	if err := conn.Connect(); err != nil {
+		return err
+	}
+	go conn.recv()
+	s.conn = conn
+
+	if err = s.call(&HandshakeRequest{
+		AppID: s.AppID,
+		Key:   ap.AccessKey,
+	}); err != nil {
+		return err
+	}
+
+	if err = s.call(&RegisterRequest{Config: s.Config}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Server) Write(sess *Session, reader io.Reader) error {
+func (s *Server) Send(sess *Session, reader io.Reader) error {
 	var data DataTransfer
 	data.SessionID = sess.SessionID
 	data.Data = reader
 
 	var req Request
-	req.Cmd = 1
+	req.Cmd = svrCmdData
 	req.Body = reader
 	return s.conn.Push(&req)
 }
@@ -97,8 +103,8 @@ func (s *Server) signUrl(vals url.Values) {
 }
 
 type AccessPoint struct {
-	Addr string `json:"addr"`
-	Key  string `json:"key"`
+	Addr      string `json:"addr"`
+	AccessKey string `json:"access_key"`
 }
 
 func (s *Server) getAccessPoint() (*AccessPoint, error) {
@@ -124,27 +130,27 @@ func (s *Server) getAccessPoint() (*AccessPoint, error) {
 	return &ret, nil
 }
 
-func (s *Server) handshake(ap *AccessPoint) error {
-	conn := newConnection("tcp", ap.Addr)
-	if err := conn.Connect(); err != nil {
-		return err
-	}
-
-	var reqbody HandshakeRequest
-	reqbody.AppID = s.AppID
-	reqbody.Key = ap.Key
-	body, err := reqbody.GetBody()
-	if err != nil {
+func (s *Server) call(api ServerAPI) error {
+	bb := bytes.NewBuffer(nil)
+	if _, err := api.WriteTo(bb); err != nil {
 		return err
 	}
 
 	var req Request
-	req.Cmd = svrCmdHandshake
-	req.Body = body
-	if _, err = conn.Call(context.Background(), &req); err != nil {
-		conn.Close()
+	req.Cmd = api.Cmd()
+	req.Body = bb
+	_, err := s.conn.Call(context.Background(), &req)
+	return err
+}
+
+func (s *Server) push(api ServerAPI) error {
+	bb := bytes.NewBuffer(nil)
+	if _, err := api.WriteTo(bb); err != nil {
 		return err
 	}
-	s.conn = conn
-	return nil
+
+	var req Request
+	req.Cmd = api.Cmd()
+	req.Body = bb
+	return s.conn.Push(&req)
 }

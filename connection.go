@@ -49,11 +49,11 @@ func (c *Connection) Connect() error {
 	}
 
 	c.nc = nc
-	go c.recv(c.nc)
 	return nil
 }
 
-func (c *Connection) recv(nc net.Conn) {
+func (c *Connection) recv() {
+	nc := c.nc
 	for {
 		var p Packet
 		if err := p.Read(nc); err != nil {
