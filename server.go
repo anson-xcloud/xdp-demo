@@ -57,15 +57,12 @@ func (s *Server) Serve() error {
 	s.conn = conn
 
 	if err = s.call(&HandshakeRequest{
-		AppID: s.AppID,
-		Key:   ap.AccessKey,
+		AppID:     s.AppID,
+		AccessKey: ap.AccessKey,
 	}); err != nil {
 		return err
 	}
 
-	if err = s.call(&RegisterRequest{Config: s.Config}); err != nil {
-		return err
-	}
 	return nil
 }
 

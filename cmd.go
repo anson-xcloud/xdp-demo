@@ -17,8 +17,8 @@ type ServerAPI interface {
 }
 
 type HandshakeRequest struct {
-	AppID string
-	Key   string
+	AppID     string
+	AccessKey string
 }
 
 func (r *HandshakeRequest) Cmd() int {
@@ -26,20 +26,7 @@ func (r *HandshakeRequest) Cmd() int {
 }
 
 func (r *HandshakeRequest) WriteTo(w io.Writer) (int64, error) {
-	n, err := writeString(w, r.Key)
-	return int64(n), err
-}
-
-type RegisterRequest struct {
-	Config string
-}
-
-func (r *RegisterRequest) Cmd() int {
-	return svrCmdRegister
-}
-
-func (r *RegisterRequest) WriteTo(w io.Writer) (int64, error) {
-	n, err := writeString(w, r.Config)
+	n, err := writeString(w, r.AccessKey)
 	return int64(n), err
 }
 
