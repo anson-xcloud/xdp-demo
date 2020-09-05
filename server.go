@@ -69,14 +69,19 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-func (s *Server) Send(sess *Session, reader io.Reader) error {
-	var data DataTransfer
-	data.SessionID = sess.SessionID
-	data.Data = reader
+func (s *Server) Send(sess *Session, data []byte) error {
+	var dt DataTransfer
+	dt.SessionID = sess.SessionID
+	dt.Data = data
+
+	bb := bytes.NewBuffer(nil)
+	if _, err := dt.WriteTo(bb); err != nil {
+		return err
+	}
 
 	var req Request
 	req.Cmd = svrCmdData
-	req.Body = reader
+	req.Body = bb
 	return s.conn.Push(&req)
 }
 

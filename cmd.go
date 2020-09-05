@@ -2,7 +2,6 @@ package xdp
 
 import (
 	"io"
-	"io/ioutil"
 )
 
 const (
@@ -47,7 +46,7 @@ func (r *RegisterRequest) WriteTo(w io.Writer) (int64, error) {
 type DataTransfer struct {
 	SessionID string
 	OpenID    string
-	Data      io.Reader
+	Data      []byte
 }
 
 func (r *DataTransfer) Cmd() int {
@@ -67,11 +66,7 @@ func (r *DataTransfer) WriteTo(w io.Writer) (int64, error) {
 	}
 	total += n
 
-	data, err := ioutil.ReadAll(r.Data)
-	if err != nil {
-		return 0, err
-	}
-	if n, err = w.Write(data); err != nil {
+	if n, err = w.Write(r.Data); err != nil {
 		return 0, err
 	}
 	total += n
