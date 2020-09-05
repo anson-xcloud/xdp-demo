@@ -95,7 +95,15 @@ func (c *Connection) Fetch() chan *Request {
 }
 
 func (c *Connection) Push(req *Request) error {
-	return nil
+	data, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	var p Packet
+	p.Cmd = uint32(req.Cmd)
+	p.Data = data
+	return c.write(&p)
 }
 
 func (c *Connection) Call(ctx context.Context, req *Request) (*Response, error) {
