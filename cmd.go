@@ -2,6 +2,7 @@ package xdp
 
 import (
 	"io"
+	"io/ioutil"
 )
 
 const (
@@ -26,7 +27,7 @@ func (r *HandshakeRequest) Cmd() int {
 }
 
 func (r *HandshakeRequest) WriteTo(w io.Writer) (int64, error) {
-	n, err := w.Write([]byte(r.Key))
+	n, err := writeString(w, r.Key)
 	return int64(n), err
 }
 
@@ -39,7 +40,7 @@ func (r *RegisterRequest) Cmd() int {
 }
 
 func (r *RegisterRequest) WriteTo(w io.Writer) (int64, error) {
-	n, err := w.Write([]byte(r.Config))
+	n, err := writeString(w, r.Config)
 	return int64(n), err
 }
 
@@ -54,6 +55,26 @@ func (r *DataTransfer) Cmd() int {
 }
 
 func (r *DataTransfer) WriteTo(w io.Writer) (int64, error) {
-	n, err := w.Write([]byte(r.SessionID))
-	return int64(n), err
+	var n, total int
+	var err error
+	if n, err = writeString(w, r.SessionID); err != nil {
+		return 0, err
+	}
+	total += n
+
+	if n, err = writeString(w, r.OpenID); err != nil {
+		return 0, err
+	}
+	total += n
+
+	data, err := ioutil.ReadAll(r.Data)
+	if err != nil {
+		return 0, err
+	}
+	if n, err = w.Write(data); err != nil {
+		return 0, err
+	}
+	total += n
+
+	return int64(total), err
 }

@@ -7,8 +7,6 @@ import (
 
 const flagRPCResponse = 0x1
 
-var endian = binary.LittleEndian
-
 // TODO
 // adjust like http header
 // Proto      string // XDP/1
