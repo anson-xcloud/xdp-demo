@@ -125,11 +125,19 @@ func (s *Server) getAccessPoint() (*AccessPoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ret AccessPoint
+	type AccessPointResult struct {
+		Status int    `json:"status"`
+		Msg    string `json:"msg"`
+		AccessPoint
+	}
+	var ret AccessPointResult
 	if err := json.Unmarshal(data, &ret); err != nil {
 		return nil, err
 	}
-	return &ret, nil
+	if ret.Status != 0 {
+		return nil, fmt.Errorf("response error(%d):%s", ret.Status, ret.Msg)
+	}
+	return &ret.AccessPoint, nil
 }
 
 func (s *Server) call(api ServerAPI) error {
