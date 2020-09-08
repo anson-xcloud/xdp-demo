@@ -19,3 +19,20 @@ func writeString(writer io.Writer, s string) (n int, err error) {
 
 	return
 }
+
+func readString(r io.Reader) (string, error) {
+	var c uint32
+	if err := binary.Read(r, endian, &c); err != nil {
+		return "", err
+	}
+	if c == 0 {
+		return "", nil
+	}
+
+	buf := make([]byte, c)
+	if _, err := r.Read(buf); err != nil {
+		return "", err
+	}
+
+	return string(buf), nil
+}
