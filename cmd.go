@@ -3,6 +3,7 @@ package xdp
 import (
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 )
 
 const (
@@ -56,6 +57,21 @@ type DataTransfer struct {
 
 func (r *DataTransfer) Cmd() int {
 	return svrCmdData
+}
+
+func (r *DataTransfer) ReadFrom(rd io.Reader) (n int64, err error) {
+	if r.SessionID, err = readString(rd); err != nil {
+		return 0, err
+	}
+
+	if r.OpenID, err = readString(rd); err != nil {
+		return 0, err
+	}
+
+	if r.Data, err = ioutil.ReadAll(rd); err != nil {
+		return 0, err
+	}
+	return 0, nil
 }
 
 func (r *DataTransfer) WriteTo(w io.Writer) (int64, error) {

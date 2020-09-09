@@ -1,10 +1,8 @@
 package xdp
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io/ioutil"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -31,14 +29,12 @@ type Connection struct {
 
 	rpcid   uint32
 	callers map[uint32]*caller
-	paks    chan *Packet
 }
 
 func newConnection(network, address string) *Connection {
 	conn := new(Connection)
 	conn.network, conn.address = network, address
 	conn.callers = make(map[uint32]*caller)
-	conn.paks = make(chan *Packet, 1024)
 	return conn
 }
 
@@ -52,7 +48,7 @@ func (c *Connection) Connect() error {
 	return nil
 }
 
-func (c *Connection) recv() {
+func (c *Connection) recv(handler func(p *Packet)) {
 	nc := c.nc
 	for {
 		var p Packet
@@ -61,7 +57,19 @@ func (c *Connection) recv() {
 			break
 		}
 
-		go c.process(&p)
+		if p.Flag&flagRPCResponse != 0 {
+			c.mtx.Lock()
+			if ctx, ok := c.callers[p.ID]; !ok {
+				c.mtx.Unlock()
+				c.Errorf("%s unexisted rpc return %d", c.nc.RemoteAddr(), p.ID)
+			} else {
+				delete(c.callers, p.ID)
+				c.mtx.Unlock()
+				ctx.ch <- &p
+			}
+		} else {
+			go handler(&p)
+		}
 	}
 }
 
@@ -73,56 +81,15 @@ func (c *Connection) Close() {
 	}
 }
 
-func (c *Connection) process(p *Packet) {
-	if p.Flag&flagRPCResponse != 0 {
-		c.mtx.Lock()
-		if ctx, ok := c.callers[p.ID]; !ok {
-			c.mtx.Unlock()
-			c.Errorf("%s unexisted rpc return %d", c.nc.RemoteAddr(), p.ID)
-		} else {
-			delete(c.callers, p.ID)
-			c.mtx.Unlock()
-			ctx.ch <- p
-		}
-		return
-	}
-
-	c.paks <- p
-}
-
-func (c *Connection) Fetch() chan *Request {
-	return nil
-}
-
-func (c *Connection) Push(req *Request) error {
-	data, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return err
-	}
-
-	var p Packet
-	p.Cmd = uint32(req.Cmd)
-	p.Data = data
-	return c.write(&p)
-}
-
-func (c *Connection) Call(ctx context.Context, req *Request) (*Response, error) {
-	data, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
-	}
-
+func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 	caller := newCaller()
 	caller.id = atomic.AddUint32(&c.rpcid, 1)
 	c.mtx.Lock()
 	c.callers[caller.id] = caller
 	c.mtx.Unlock()
 
-	var p Packet
 	p.ID = caller.id
-	p.Cmd = uint32(req.Cmd)
-	p.Data = data
-	if err := c.write(&p); err != nil {
+	if err := c.write(p); err != nil {
 		return nil, err
 	}
 
@@ -134,9 +101,7 @@ func (c *Connection) Call(ctx context.Context, req *Request) (*Response, error) 
 		if p.Ec != 0 {
 			return nil, errors.New("response ec")
 		}
-		return &Response{
-			Body: bytes.NewBuffer(p.Data),
-		}, nil
+		return p, nil
 	case <-ctx.Done():
 		c.mtx.Lock()
 		delete(c.callers, caller.id)

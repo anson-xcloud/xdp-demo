@@ -1,5 +1,9 @@
 package xdp
 
+import "net/http"
+
 type Handler interface {
-	ServeXDP(ResponseWriter, *Request)
+	Serve(sess *Session, cmd uint32, data []byte)
+
+	ServeHTTP(http.ResponseWriter, *http.Request)
 }

@@ -28,6 +28,41 @@ type Session struct {
 	SessionID string
 }
 
+type httpResponse struct {
+	p *Packet
+
+	sv *Server
+
+	resp HTTPResponse
+}
+
+func newHTTPResponse() *httpResponse {
+	r := new(httpResponse)
+	r.resp.Status = http.StatusOK
+	return r
+}
+
+func (r *httpResponse) Header() http.Header {
+	return http.Header{}
+}
+
+func (r *httpResponse) Write(data []byte) (int, error) {
+	r.resp.Body = string(data)
+	bb := bytes.NewBuffer(nil)
+	if _, err := r.resp.WriteTo(bb); err != nil {
+		return 0, err
+	}
+
+	r.p.Flag |= flagRPCResponse
+	r.p.Data = bb.Bytes()
+	err := r.sv.conn.write(r.p)
+	return 0, err
+}
+
+func (r *httpResponse) WriteHeader(statusCode int) {
+	r.resp.Status = uint32(statusCode)
+}
+
 type Server struct {
 	mtx sync.Mutex
 
@@ -35,7 +70,7 @@ type Server struct {
 
 	AppID, AppSecret, Config string
 
-	handler Handler
+	Handler Handler
 }
 
 func NewServer() *Server {
@@ -53,8 +88,8 @@ func (s *Server) Serve() error {
 	if err := conn.Connect(); err != nil {
 		return err
 	}
-	go conn.recv()
 	s.conn = conn
+	go conn.recv(s.process)
 
 	if err = s.call(&HandshakeRequest{
 		AppID:     s.AppID,
@@ -66,22 +101,6 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-// func (s *Server) Ping( ) error {
-// 	var dt DataTransfer
-// 	dt.SessionID = sess.SessionID
-// 	dt.Data = data
-
-// 	bb := bytes.NewBuffer(nil)
-// 	if _, err := dt.WriteTo(bb); err != nil {
-// 		return err
-// 	}
-
-// 	var req Request
-// 	req.Cmd = svrCmdData
-// 	req.Body = bb
-// 	return s.conn.Push(&req)
-// }
-
 func (s *Server) Send(sess *Session, data []byte) error {
 	var dt DataTransfer
 	dt.SessionID = sess.SessionID
@@ -92,24 +111,39 @@ func (s *Server) Send(sess *Session, data []byte) error {
 		return err
 	}
 
-	var req Request
-	req.Cmd = svrCmdData
-	req.Body = bb
-	return s.conn.Push(&req)
+	var p Packet
+	p.Cmd = svrCmdData
+	p.Data = bb.Bytes()
+	return s.conn.write(&p)
 }
 
-func (s *Server) process() {
-	select {
-	case p := <-s.conn.Fetch():
-		_ = p
-		// var dt DataTransfer
-		// if err := dt.Unmarshal(p.Data); err != nil {
-		// 	return nil, nil //err
-		// }
+func (s *Server) process(p *Packet) {
+	switch p.Cmd {
+	case svrCmdData:
+		bb := bytes.NewBuffer(p.Data)
+		var dt DataTransfer
+		if _, err := dt.ReadFrom(bb); err != nil {
+			return
+		}
+		sess := &Session{}
+		sess.SessionID = dt.SessionID
+		if s.Handler != nil {
+			s.Handler.Serve(sess, 0, dt.Data)
+		}
+	case svrCmdHTTP:
+		bb := bytes.NewBuffer(p.Data)
+		var dt HTTPRequest
+		if _, err := dt.ReadFrom(bb); err != nil {
+			return
+		}
 
-		// s := &session{}
-		// s.id = dt.SessionID
-		// s.srv.OnSessionData(s, p.Data)
+		req, _ := http.NewRequest("Get", dt.Path, nil)
+		res := newHTTPResponse()
+		res.p = p
+		res.sv = s
+		if s.Handler != nil {
+			s.Handler.ServeHTTP(res, req)
+		}
 	}
 }
 
@@ -162,10 +196,10 @@ func (s *Server) call(api ServerAPI) error {
 		return err
 	}
 
-	var req Request
-	req.Cmd = api.Cmd()
-	req.Body = bb
-	_, err := s.conn.Call(context.Background(), &req)
+	var p Packet
+	p.Cmd = uint32(api.Cmd())
+	p.Data = bb.Bytes()
+	_, err := s.conn.Call(context.Background(), &p)
 	return err
 }
 
@@ -175,8 +209,8 @@ func (s *Server) push(api ServerAPI) error {
 		return err
 	}
 
-	var req Request
-	req.Cmd = api.Cmd()
-	req.Body = bb
-	return s.conn.Push(&req)
+	var p Packet
+	p.Cmd = uint32(api.Cmd())
+	p.Data = bb.Bytes()
+	return s.conn.write(&p)
 }
