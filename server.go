@@ -14,6 +14,10 @@ import (
 	"sync"
 )
 
+func ListenAndServe(url string, handler Handler) {
+
+}
+
 type ServerInterface interface {
 	Ping() error
 
