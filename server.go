@@ -6,24 +6,37 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
+	"sync/atomic"
+
+	"github.com/anson-xcloud/xdp-demo/api"
 )
 
-func ListenAndServe(url string, handler Handler) {
-
+type Address struct {
+	AppID, AppSecret string
 }
 
-type ServerInterface interface {
-	Ping() error
+func ParseAddress(addr string) (*Address, error) {
+	sl := strings.Split(addr, ":")
+	if len(sl) != 2 {
+		return nil, errors.New("url format error")
+	}
 
-	Serve() error
+	return &Address{AppID: sl[0], AppSecret: sl[1]}, nil
+}
 
-	Write(*Session, io.Reader)
+type Server interface {
+	Serve(addr string) error
+
+	Send(sess *Session, data []byte) error
+
+	// Ping() error
 }
 
 type Session struct {
@@ -32,57 +45,79 @@ type Session struct {
 	SessionID string
 }
 
-type httpResponse struct {
-	p *Packet
+type httpResponseWriter struct {
+	p *api.Packet
 
-	sv *Server
+	sv *xdpServer
 
-	resp HTTPResponse
+	api.HTTPResponse
+
+	writed int32
 }
 
-func newHTTPResponse() *httpResponse {
-	r := new(httpResponse)
-	r.resp.Status = http.StatusOK
-	return r
-}
-
-func (r *httpResponse) Header() http.Header {
-	return http.Header{}
-}
-
-func (r *httpResponse) Write(data []byte) (int, error) {
-	r.resp.Body = string(data)
-	bb := bytes.NewBuffer(nil)
-	if _, err := r.resp.WriteTo(bb); err != nil {
-		return 0, err
+func (r *httpResponseWriter) Write(data []byte) {
+	if r.Status == 0 {
+		r.Status = uint32(http.StatusOK)
 	}
 
+	r.Body = string(data)
+
+	r.write()
+}
+
+func (r *httpResponseWriter) WriteHeader(statusCode int) {
+	r.Status = uint32(statusCode)
+
+	r.write()
+}
+
+func (r *httpResponseWriter) write() error {
+	if !atomic.CompareAndSwapInt32(&r.writed, 0, 1) {
+		return errors.New("rewrite response")
+	}
+
+	bb := bytes.NewBuffer(nil)
+	if _, err := r.HTTPResponse.WriteTo(bb); err != nil {
+		return err
+	}
 	r.p.Flag |= flagRPCResponse
 	r.p.Data = bb.Bytes()
-	err := r.sv.conn.write(r.p)
-	return 0, err
+	return r.sv.conn.write(r.p)
 }
 
-func (r *httpResponse) WriteHeader(statusCode int) {
-	r.resp.Status = uint32(statusCode)
-}
-
-type Server struct {
+type xdpServer struct {
 	mtx sync.Mutex
 
 	conn *Connection
 
-	AppID, AppSecret, Config string
+	Config string
 
-	Handler Handler
+	addr *Address
+
+	handler Handler
+
+	httpHandler HTTPHandler
 }
 
-func NewServer() *Server {
-	svr := new(Server)
+func NewServer(handler interface{}) Server {
+	svr := new(xdpServer)
+
+	if h, ok := handler.(Handler); ok {
+		svr.handler = h
+	}
+	if h, ok := handler.(HTTPHandler); ok {
+		svr.httpHandler = h
+	}
 	return svr
 }
 
-func (s *Server) Serve() error {
+func (s *xdpServer) Serve(addr string) error {
+	ad, err := ParseAddress(addr)
+	if err != nil {
+		return err
+	}
+	s.addr = ad
+
 	ap, err := s.getAccessPoint()
 	if err != nil {
 		return err
@@ -95,8 +130,8 @@ func (s *Server) Serve() error {
 	s.conn = conn
 	go conn.recv(s.process)
 
-	if err = s.call(&HandshakeRequest{
-		AppID:     s.AppID,
+	if err = s.call(&api.HandshakeRequest{
+		AppID:     s.addr.AppID,
 		AccessKey: ap.AccessKey,
 	}); err != nil {
 		return err
@@ -105,8 +140,8 @@ func (s *Server) Serve() error {
 	return nil
 }
 
-func (s *Server) Send(sess *Session, data []byte) error {
-	var dt DataTransfer
+func (s *xdpServer) Send(sess *Session, data []byte) error {
+	var dt api.DataTransfer
 	dt.SessionID = sess.SessionID
 	dt.Data = data
 
@@ -115,44 +150,23 @@ func (s *Server) Send(sess *Session, data []byte) error {
 		return err
 	}
 
-	var p Packet
-	p.Cmd = svrCmdData
+	var p api.Packet
+	p.Cmd = api.CmdData
 	p.Data = bb.Bytes()
 	return s.conn.write(&p)
 }
 
-func (s *Server) process(p *Packet) {
+func (s *xdpServer) process(p *api.Packet) {
 	switch p.Cmd {
-	case svrCmdData:
-		bb := bytes.NewBuffer(p.Data)
-		var dt DataTransfer
-		if _, err := dt.ReadFrom(bb); err != nil {
-			return
-		}
-		sess := &Session{}
-		sess.SessionID = dt.SessionID
-		if s.Handler != nil {
-			s.Handler.Serve(sess, 0, dt.Data)
-		}
-	case svrCmdHTTP:
-		bb := bytes.NewBuffer(p.Data)
-		var dt HTTPRequest
-		if _, err := dt.ReadFrom(bb); err != nil {
-			return
-		}
-
-		req, _ := http.NewRequest("Get", dt.Path, nil)
-		res := newHTTPResponse()
-		res.p = p
-		res.sv = s
-		if s.Handler != nil {
-			s.Handler.ServeHTTP(res, req)
-		}
+	case api.CmdData:
+		s.handleData(p)
+	case api.CmdHTTP:
+		s.handleHTTP(p)
 	}
 }
 
-func (s *Server) signUrl(vals url.Values) {
-	md5str := fmt.Sprintf("%s%s", vals.Encode(), s.AppSecret)
+func (s *xdpServer) signUrl(vals url.Values) {
+	md5str := fmt.Sprintf("%s%s", vals.Encode(), s.addr.AppSecret)
 	m := md5.New()
 	token := hex.EncodeToString(m.Sum([]byte(md5str)))
 	vals.Set("token", token)
@@ -163,9 +177,9 @@ type AccessPoint struct {
 	AccessKey string `json:"access_key"`
 }
 
-func (s *Server) getAccessPoint() (*AccessPoint, error) {
+func (s *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	values := make(url.Values)
-	values.Set("appid", s.AppID)
+	values.Set("appid", s.addr.AppID)
 	s.signUrl(values)
 	url := fmt.Sprintf("%s%s?%s", XCloudAddr, APIAccessPoint, values.Encode())
 
@@ -194,27 +208,68 @@ func (s *Server) getAccessPoint() (*AccessPoint, error) {
 	return &ret.AccessPoint, nil
 }
 
-func (s *Server) call(api ServerAPI) error {
+func (s *xdpServer) call(sa api.ServerAPI) error {
 	bb := bytes.NewBuffer(nil)
-	if _, err := api.WriteTo(bb); err != nil {
+	if _, err := sa.WriteTo(bb); err != nil {
 		return err
 	}
 
-	var p Packet
-	p.Cmd = uint32(api.Cmd())
+	var p api.Packet
+	p.Cmd = uint32(sa.Cmd())
 	p.Data = bb.Bytes()
 	_, err := s.conn.Call(context.Background(), &p)
 	return err
 }
 
-func (s *Server) push(api ServerAPI) error {
+func (s *xdpServer) push(sa api.ServerAPI) error {
 	bb := bytes.NewBuffer(nil)
-	if _, err := api.WriteTo(bb); err != nil {
+	if _, err := sa.WriteTo(bb); err != nil {
 		return err
 	}
 
-	var p Packet
-	p.Cmd = uint32(api.Cmd())
+	var p api.Packet
+	p.Cmd = uint32(sa.Cmd())
 	p.Data = bb.Bytes()
 	return s.conn.write(&p)
+}
+
+func (s *xdpServer) handleData(p *api.Packet) {
+	if s.handler == nil {
+		return
+	}
+
+	bb := bytes.NewBuffer(p.Data)
+	var dt api.DataTransfer
+	if _, err := dt.ReadFrom(bb); err != nil {
+		return
+	}
+
+	sess := &Session{}
+	sess.SessionID = dt.SessionID
+
+	var req Request
+	req.Session = sess
+	s.handler.Serve(&req)
+}
+
+func (s *xdpServer) handleHTTP(p *api.Packet) {
+	res := &httpResponseWriter{}
+	res.p = p
+	res.sv = s
+	res.writed = 0
+
+	if s.httpHandler == nil {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	bb := bytes.NewBuffer(p.Data)
+	var dt api.HTTPRequest
+	if _, err := dt.ReadFrom(bb); err != nil {
+		return
+	}
+
+	var req HTTPRequest
+	req.Path = dt.Path
+	s.httpHandler.ServeHTTP(res, &req)
 }

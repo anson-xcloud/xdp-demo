@@ -1,4 +1,4 @@
-package xdp
+package api
 
 import (
 	"encoding/binary"
@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	svrCmdHandshake = 1
-	svrCmdData      = 2
-	svrCmdHTTP      = 3
+	CmdHandshake = 1
+	CmdData      = 2
+	CmdHTTP      = 3
 )
 
 type ServerAPI interface {
@@ -25,7 +25,7 @@ type HandshakeRequest struct {
 }
 
 func (r *HandshakeRequest) Cmd() int {
-	return svrCmdHandshake
+	return CmdHandshake
 }
 
 func (r *HandshakeRequest) WriteTo(w io.Writer) (int64, error) {
@@ -56,7 +56,7 @@ type DataTransfer struct {
 }
 
 func (r *DataTransfer) Cmd() int {
-	return svrCmdData
+	return CmdData
 }
 
 func (r *DataTransfer) ReadFrom(rd io.Reader) (n int64, err error) {
@@ -112,7 +112,7 @@ type HTTPResponse struct {
 }
 
 func (r *HTTPResponse) Cmd() int {
-	return svrCmdHTTP
+	return CmdHTTP
 }
 
 func (r *HTTPResponse) WriteTo(w io.Writer) (int64, error) {

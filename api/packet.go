@@ -1,11 +1,9 @@
-package xdp
+package api
 
 import (
 	"encoding/binary"
 	"io"
 )
-
-const flagRPCResponse = 0x1
 
 // TODO
 // adjust like http header

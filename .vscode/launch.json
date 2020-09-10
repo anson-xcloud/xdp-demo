@@ -18,8 +18,8 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/_examples/basic/main.go",
-            "cwd": "${workspaceRoot}/_examples/basic",
+            "program": "${workspaceRoot}/_examples/echo/server/main.go",
+            "cwd": "${workspaceRoot}/_examples/echo/server",
             "env": {},
             "args": []
         }

@@ -1,0 +1,11 @@
+version: v1
+name: echo
+env: test
+resource:
+  net: "1/4"
+tcp:
+  - "/get"
+http:
+  - "/get"
+  - "/set" 
+  
