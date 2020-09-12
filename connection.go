@@ -6,20 +6,18 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-
-	"github.com/anson-xcloud/xdp-demo/api"
 )
 
 const flagRPCResponse = 0x1
 
 type caller struct {
 	id uint32
-	ch chan *api.Packet
+	ch chan *Packet
 }
 
 func newCaller() *caller {
 	c := new(caller)
-	c.ch = make(chan *api.Packet)
+	c.ch = make(chan *Packet)
 	return c
 }
 
@@ -52,10 +50,10 @@ func (c *Connection) Connect() error {
 	return nil
 }
 
-func (c *Connection) recv(handler func(p *api.Packet)) {
+func (c *Connection) recv(handler func(p *Packet)) {
 	nc := c.nc
 	for {
-		var p api.Packet
+		var p Packet
 		if err := p.Read(nc); err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				continue
@@ -88,7 +86,7 @@ func (c *Connection) Close() {
 	}
 }
 
-func (c *Connection) Call(ctx context.Context, p *api.Packet) (*api.Packet, error) {
+func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 	caller := newCaller()
 	caller.id = atomic.AddUint32(&c.rpcid, 1)
 	c.mtx.Lock()
@@ -117,7 +115,7 @@ func (c *Connection) Call(ctx context.Context, p *api.Packet) (*api.Packet, erro
 	}
 }
 
-func (c *Connection) write(p *api.Packet) error {
+func (c *Connection) write(p *Packet) error {
 	p.Length = uint32(len(p.Data))
 	if err := p.Write(c.nc); err != nil {
 		return err

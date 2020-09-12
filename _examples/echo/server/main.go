@@ -8,11 +8,9 @@ import (
 )
 
 func main() {
-	sm := xdp.NewServeMux()
-	sm.HTTPHandleFunc("/get", httpEcho)
-	sm.HandleFunc("", tcpEcho)
-
-	svr := xdp.NewServer(sm)
+	svr := xdp.NewServer()
+	svr.HTTPHandleFunc("/get", httpEcho)
+	svr.HandleFunc("", tcpEcho)
 	if err := svr.Serve("1:test"); err != nil {
 		fmt.Println(err)
 	}
@@ -20,7 +18,9 @@ func main() {
 }
 
 func httpEcho(res xdp.HTTPResponseWriter, req *xdp.HTTPRequest) {
-	res.Write([]byte("echo"))
+	echo := fmt.Sprintf("echo %s", time.Now().Format(time.RFC3339))
+
+	res.Write([]byte(echo))
 }
 
 func tcpEcho(req *xdp.Request) {

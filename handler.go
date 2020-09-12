@@ -1,8 +1,12 @@
 package xdp
 
 import (
+	"bytes"
+	"errors"
 	"net/http"
-	"sync"
+	"sync/atomic"
+
+	"github.com/anson-xcloud/xdp-demo/api"
 )
 
 type Request struct {
@@ -24,76 +28,42 @@ type HTTPResponseWriter interface {
 	Write(data []byte)
 }
 
-type Handler interface {
-	Serve(*Request)
+type httpResponseWriter struct {
+	p *Packet
+
+	sv *xdpServer
+
+	api.HTTPResponse
+
+	writed int32
 }
 
-type HTTPHandler interface {
-	ServeHTTP(HTTPResponseWriter, *HTTPRequest)
-}
-
-type HandlerFunc func(*Request)
-
-func (f HandlerFunc) Serve(req *Request) {
-	f(req)
-}
-
-type HTTPHandlerFunc func(HTTPResponseWriter, *HTTPRequest)
-
-func (f HTTPHandlerFunc) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
-	f(res, req)
-}
-
-type ServeMux struct {
-	mtx sync.RWMutex
-
-	hs  map[string]Handler
-	hhs map[string]HTTPHandler
-}
-
-func NewServeMux() *ServeMux {
-	sm := new(ServeMux)
-	sm.hs = make(map[string]Handler)
-	sm.hhs = make(map[string]HTTPHandler)
-	return sm
-}
-
-func (m *ServeMux) HandleFunc(pattern string, h HandlerFunc) {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-
-	m.hs[pattern] = h
-}
-
-func (m *ServeMux) HTTPHandleFunc(pattern string, hh HTTPHandlerFunc) {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-
-	m.hhs[pattern] = hh
-}
-
-func (m *ServeMux) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
-	m.mtx.RLock()
-	hh, ok := m.hhs[req.Path]
-	if !ok {
-		m.mtx.RUnlock()
-
-		res.WriteHeader(http.StatusNotFound)
-		return
+func (r *httpResponseWriter) Write(data []byte) {
+	if r.Status == 0 {
+		r.Status = uint32(http.StatusOK)
 	}
-	m.mtx.RUnlock()
 
-	hh.ServeHTTP(res, req)
+	r.Body = string(data)
+
+	r.write()
 }
 
-func (m *ServeMux) Serve(req *Request) {
-	m.mtx.RLock()
-	h, ok := m.hs[req.Path]
-	if !ok {
-		m.mtx.RUnlock()
-		return
-	}
-	m.mtx.RUnlock()
+func (r *httpResponseWriter) WriteHeader(statusCode int) {
+	r.Status = uint32(statusCode)
 
-	h.Serve(req)
+	r.write()
+}
+
+func (r *httpResponseWriter) write() error {
+	if !atomic.CompareAndSwapInt32(&r.writed, 0, 1) {
+		return errors.New("rewrite response")
+	}
+
+	bb := bytes.NewBuffer(nil)
+	if _, err := r.HTTPResponse.WriteTo(bb); err != nil {
+		return err
+	}
+	r.p.Flag |= flagRPCResponse
+	r.p.Data = bb.Bytes()
+	return r.sv.conn.write(r.p)
 }

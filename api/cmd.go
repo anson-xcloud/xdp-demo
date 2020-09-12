@@ -10,6 +10,9 @@ const (
 	CmdHandshake = 1
 	CmdData      = 2
 	CmdHTTP      = 3
+
+	CmdSessionConnect = 11
+	CmdSessionClose   = 12
 )
 
 type ServerAPI interface {

@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/anson-xcloud/xdp-demo/api"
 )
@@ -31,7 +30,32 @@ func ParseAddress(addr string) (*Address, error) {
 	return &Address{AppID: sl[0], AppSecret: sl[1]}, nil
 }
 
+type Handler interface {
+	Serve(*Request)
+}
+
+type HTTPHandler interface {
+	ServeHTTP(HTTPResponseWriter, *HTTPRequest)
+}
+
+type HandlerFunc func(*Request)
+
+func (f HandlerFunc) Serve(req *Request) {
+	f(req)
+}
+
+type HTTPHandlerFunc func(HTTPResponseWriter, *HTTPRequest)
+
+func (f HTTPHandlerFunc) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
+	f(res, req)
+}
+
 type Server interface {
+	HandleFunc(pattern string, h HandlerFunc)
+	HTTPHandleFunc(pattern string, hh HTTPHandlerFunc)
+	Handle(pattern string, h Handler)
+	HTTPHandle(pattern string, hh HTTPHandler)
+
 	Serve(addr string) error
 
 	Send(sess *Session, data []byte) error
@@ -39,76 +63,68 @@ type Server interface {
 	// Ping() error
 }
 
-type Session struct {
-	Addr      string
-	OpenID    string
-	SessionID string
-}
-
-type httpResponseWriter struct {
-	p *api.Packet
-
-	sv *xdpServer
-
-	api.HTTPResponse
-
-	writed int32
-}
-
-func (r *httpResponseWriter) Write(data []byte) {
-	if r.Status == 0 {
-		r.Status = uint32(http.StatusOK)
-	}
-
-	r.Body = string(data)
-
-	r.write()
-}
-
-func (r *httpResponseWriter) WriteHeader(statusCode int) {
-	r.Status = uint32(statusCode)
-
-	r.write()
-}
-
-func (r *httpResponseWriter) write() error {
-	if !atomic.CompareAndSwapInt32(&r.writed, 0, 1) {
-		return errors.New("rewrite response")
-	}
-
-	bb := bytes.NewBuffer(nil)
-	if _, err := r.HTTPResponse.WriteTo(bb); err != nil {
-		return err
-	}
-	r.p.Flag |= flagRPCResponse
-	r.p.Data = bb.Bytes()
-	return r.sv.conn.write(r.p)
-}
-
 type xdpServer struct {
-	mtx sync.Mutex
-
-	conn *Connection
+	mtx sync.RWMutex
 
 	Config string
 
 	addr *Address
+	conn *Connection
 
-	handler Handler
-
-	httpHandler HTTPHandler
+	hs  map[string]Handler
+	hhs map[string]HTTPHandler
 }
 
-func NewServer(handler interface{}) Server {
+func NewServer() Server {
 	svr := new(xdpServer)
 
-	if h, ok := handler.(Handler); ok {
-		svr.handler = h
-	}
-	if h, ok := handler.(HTTPHandler); ok {
-		svr.httpHandler = h
-	}
+	svr.hs = make(map[string]Handler)
+	svr.hhs = make(map[string]HTTPHandler)
 	return svr
+}
+
+func (s *xdpServer) HandleFunc(pattern string, h HandlerFunc) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.hs[pattern] = h
+}
+
+func (s *xdpServer) HTTPHandleFunc(pattern string, hh HTTPHandlerFunc) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.hhs[pattern] = hh
+}
+
+func (s *xdpServer) Handle(pattern string, h Handler) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.hs[pattern] = h
+}
+
+func (s *xdpServer) HTTPHandle(pattern string, hh HTTPHandler) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+
+	s.hhs[pattern] = hh
+}
+
+func (s *xdpServer) getHTTPHandler(req *HTTPRequest) HTTPHandler {
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
+
+	hh := s.hhs[req.Path]
+	return hh
+}
+
+func (s *xdpServer) getHandler(req *Request) Handler {
+	s.mtx.RLock()
+	defer s.mtx.RUnlock()
+
+	h := s.hs[req.Path]
+	return h
 }
 
 func (s *xdpServer) Serve(addr string) error {
@@ -150,13 +166,13 @@ func (s *xdpServer) Send(sess *Session, data []byte) error {
 		return err
 	}
 
-	var p api.Packet
+	var p Packet
 	p.Cmd = api.CmdData
 	p.Data = bb.Bytes()
 	return s.conn.write(&p)
 }
 
-func (s *xdpServer) process(p *api.Packet) {
+func (s *xdpServer) process(p *Packet) {
 	switch p.Cmd {
 	case api.CmdData:
 		s.handleData(p)
@@ -214,7 +230,7 @@ func (s *xdpServer) call(sa api.ServerAPI) error {
 		return err
 	}
 
-	var p api.Packet
+	var p Packet
 	p.Cmd = uint32(sa.Cmd())
 	p.Data = bb.Bytes()
 	_, err := s.conn.Call(context.Background(), &p)
@@ -227,17 +243,13 @@ func (s *xdpServer) push(sa api.ServerAPI) error {
 		return err
 	}
 
-	var p api.Packet
+	var p Packet
 	p.Cmd = uint32(sa.Cmd())
 	p.Data = bb.Bytes()
 	return s.conn.write(&p)
 }
 
-func (s *xdpServer) handleData(p *api.Packet) {
-	if s.handler == nil {
-		return
-	}
-
+func (s *xdpServer) handleData(p *Packet) {
 	bb := bytes.NewBuffer(p.Data)
 	var dt api.DataTransfer
 	if _, err := dt.ReadFrom(bb); err != nil {
@@ -246,30 +258,32 @@ func (s *xdpServer) handleData(p *api.Packet) {
 
 	sess := &Session{}
 	sess.SessionID = dt.SessionID
+	sess.sv = s
 
 	var req Request
 	req.Session = sess
-	s.handler.Serve(&req)
+	if h := s.getHandler(&req); h != nil {
+		h.Serve(&req)
+	}
 }
 
-func (s *xdpServer) handleHTTP(p *api.Packet) {
-	res := &httpResponseWriter{}
-	res.p = p
-	res.sv = s
-	res.writed = 0
-
-	if s.httpHandler == nil {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-
+func (s *xdpServer) handleHTTP(p *Packet) {
 	bb := bytes.NewBuffer(p.Data)
 	var dt api.HTTPRequest
 	if _, err := dt.ReadFrom(bb); err != nil {
 		return
 	}
 
+	res := &httpResponseWriter{}
+	res.p = p
+	res.sv = s
+	res.writed = 0
+
 	var req HTTPRequest
 	req.Path = dt.Path
-	s.httpHandler.ServeHTTP(res, &req)
+	if h := s.getHTTPHandler(&req); h != nil {
+		h.ServeHTTP(res, &req)
+	} else {
+		res.WriteHeader(http.StatusNotFound)
+	}
 }
