@@ -19,8 +19,8 @@ type Request struct {
 type HTTPRequest struct {
 	Request
 
-	Method  string
-	Headers map[string]string
+	Method string
+	Forms  map[string]string
 }
 
 // HTTPResponseWriter http response write

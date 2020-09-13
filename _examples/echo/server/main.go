@@ -21,7 +21,7 @@ func httpEcho(res xdp.HTTPResponseWriter, req *xdp.HTTPRequest) {
 	echo := fmt.Sprintf("%s : %s %v",
 		time.Now().Format(time.RFC3339),
 		req.Path,
-		req.Headers,
+		req.Forms,
 	)
 
 	res.Write([]byte(echo))

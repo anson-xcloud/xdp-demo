@@ -244,8 +244,9 @@ func (s *Server) handleHTTP(p *Packet) {
 
 	var req HTTPRequest
 	req.Session = s.sessMgr.Get(dt.SessionID)
+	req.Method = dt.Method
 	req.Path = dt.Path
-	req.Headers = dt.Headers
+	req.Forms = dt.Forms
 	req.Data = dt.Body
 	s.opts.HTTPHandler.ServeHTTP(res, &req)
 }
