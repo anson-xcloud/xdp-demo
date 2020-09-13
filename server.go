@@ -38,6 +38,8 @@ type Server struct {
 	addr *Address
 
 	conn *Connection
+
+	sessMgr *sessionManager
 }
 
 // NewServer create server
@@ -49,6 +51,7 @@ func NewServer(opt ...Option) *Server {
 
 	svr := new(Server)
 	svr.opts = &opts
+	svr.sessMgr = newSessionManager()
 	return svr
 }
 
@@ -100,6 +103,10 @@ func (s *Server) MultiSend(sids []string, data []byte) error {
 
 func (s *Server) process(p *Packet) {
 	switch p.Cmd {
+	case uint32(api.Cmd_SessionConnect):
+		s.handleData(p)
+	case uint32(api.Cmd_SessionClose):
+		s.handleData(p)
 	case uint32(api.Cmd_SessionData):
 		s.handleData(p)
 	case uint32(api.Cmd_SessionHTTP):
@@ -179,17 +186,41 @@ func (s *Server) push(cmd api.Cmd, sa proto.Message) error {
 func (s *Server) handleData(p *Packet) {
 	var dt api.SessionDataBiNotify
 	if err := proto.Unmarshal(p.Data, &dt); err != nil {
-		s.opts.Logger.Debug("unmarshal SessionDataBiNotify error:%s", err)
+		s.opts.Logger.Debug("unmarshal handleData error:%s", err)
 		return
 	}
 
-	sess := &Session{}
-	sess.SessionID = dt.SessionID
-	sess.sv = s
-
 	var req Request
-	req.Session = sess
+	req.Session = s.sessMgr.Get(dt.SessionID)
+	req.Data = dt.Data
 	s.opts.Handler.Serve(&req)
+}
+
+func (s *Server) handleSessionConnect(p *Packet) {
+	var dt api.SessionConnectNotify
+	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+		s.opts.Logger.Debug("unmarshal handleSessionConnect error:%s", err)
+		return
+	}
+
+	var sess Session
+	sess.SessionID = dt.SessionID
+	// sess.Addr=dt.a
+	sess.sv = s
+	s.sessMgr.Add(&sess)
+	s.opts.Handler.ServeConnect(&sess)
+}
+
+func (s *Server) handleSessionClose(p *Packet) {
+	var dt api.SessionCloseNotify
+	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+		s.opts.Logger.Debug("unmarshal SessionCloseNotify error:%s", err)
+		return
+	}
+
+	sess := s.sessMgr.Get(dt.SessionID)
+	s.sessMgr.Del(sess)
+	s.opts.Handler.ServeClose(sess)
 }
 
 func (s *Server) handleHTTP(p *Packet) {
@@ -205,6 +236,9 @@ func (s *Server) handleHTTP(p *Packet) {
 	res.writed = 0
 
 	var req HTTPRequest
+	req.Session = s.sessMgr.Get(dt.SessionID)
 	req.Path = dt.Path
+	req.Headers = dt.Headers
+	req.Data = dt.Body
 	s.opts.HTTPHandler.ServeHTTP(res, &req)
 }

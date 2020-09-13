@@ -22,6 +22,12 @@ type sessionManager struct {
 	sesses map[string]*Session
 }
 
+func newSessionManager() *sessionManager {
+	sm := new(sessionManager)
+	sm.sesses = make(map[string]*Session)
+	return sm
+}
+
 func (sm *sessionManager) Get(sid string) *Session {
 	sm.RLock()
 	defer sm.RUnlock()
@@ -35,4 +41,11 @@ func (sm *sessionManager) Add(sess *Session) {
 	defer sm.Unlock()
 
 	sm.sesses[sess.SessionID] = sess
+}
+
+func (sm *sessionManager) Del(sess *Session) {
+	sm.Lock()
+	defer sm.Unlock()
+
+	delete(sm.sesses, sess.SessionID)
 }
