@@ -2,14 +2,16 @@ package xdp
 
 import "sync"
 
+// Session use session
 type Session struct {
 	Addr      string
 	OpenID    string
 	SessionID string
 
-	sv *xdpServer
+	sv *Server
 }
 
+// Send do send session data
 func (s *Session) Send(data []byte) error {
 	return s.sv.Send(s, data)
 }
@@ -26,4 +28,11 @@ func (sm *sessionManager) Get(sid string) *Session {
 
 	sess := sm.sesses[sid]
 	return sess
+}
+
+func (sm *sessionManager) Add(sess *Session) {
+	sm.Lock()
+	defer sm.Unlock()
+
+	sm.sesses[sess.SessionID] = sess
 }

@@ -14,7 +14,7 @@
             "args": []
         },
         {
-            "name": "LaunchBasic",
+            "name": "LaunchEchoServer",
             "type": "go",
             "request": "launch",
             "mode": "auto",

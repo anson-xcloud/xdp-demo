@@ -1,133 +1,59 @@
 package xdp
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/anson-xcloud/xdp-demo/api"
+	"github.com/golang/protobuf/proto"
 )
 
+// Address for app address token
+// format is   appid:appsecret
 type Address struct {
 	AppID, AppSecret string
 }
 
+// ParseAddress parse address string to *Address
 func ParseAddress(addr string) (*Address, error) {
 	sl := strings.Split(addr, ":")
 	if len(sl) != 2 {
-		return nil, errors.New("url format error")
+		return nil, ErrAddressFormat
 	}
 
 	return &Address{AppID: sl[0], AppSecret: sl[1]}, nil
 }
 
-type Handler interface {
-	Serve(*Request)
-}
-
-type HTTPHandler interface {
-	ServeHTTP(HTTPResponseWriter, *HTTPRequest)
-}
-
-type HandlerFunc func(*Request)
-
-func (f HandlerFunc) Serve(req *Request) {
-	f(req)
-}
-
-type HTTPHandlerFunc func(HTTPResponseWriter, *HTTPRequest)
-
-func (f HTTPHandlerFunc) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
-	f(res, req)
-}
-
-type Server interface {
-	HandleFunc(pattern string, h HandlerFunc)
-	HTTPHandleFunc(pattern string, hh HTTPHandlerFunc)
-	Handle(pattern string, h Handler)
-	HTTPHandle(pattern string, hh HTTPHandler)
-
-	Serve(addr string) error
-
-	Send(sess *Session, data []byte) error
-
-	// Ping() error
-}
-
-type xdpServer struct {
-	mtx sync.RWMutex
-
-	Config string
+// Server for app server
+type Server struct {
+	opts *Options
 
 	addr *Address
-	conn *Connection
 
-	hs  map[string]Handler
-	hhs map[string]HTTPHandler
+	conn *Connection
 }
 
-func NewServer() Server {
-	svr := new(xdpServer)
+// NewServer create server
+func NewServer(opt ...Option) *Server {
+	var opts = defaultOptions
+	for _, o := range opt {
+		o(&opts)
+	}
 
-	svr.hs = make(map[string]Handler)
-	svr.hhs = make(map[string]HTTPHandler)
+	svr := new(Server)
+	svr.opts = &opts
 	return svr
 }
 
-func (s *xdpServer) HandleFunc(pattern string, h HandlerFunc) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hs[pattern] = h
-}
-
-func (s *xdpServer) HTTPHandleFunc(pattern string, hh HTTPHandlerFunc) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hhs[pattern] = hh
-}
-
-func (s *xdpServer) Handle(pattern string, h Handler) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hs[pattern] = h
-}
-
-func (s *xdpServer) HTTPHandle(pattern string, hh HTTPHandler) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hhs[pattern] = hh
-}
-
-func (s *xdpServer) getHTTPHandler(req *HTTPRequest) HTTPHandler {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
-
-	hh := s.hhs[req.Path]
-	return hh
-}
-
-func (s *xdpServer) getHandler(req *Request) Handler {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
-
-	h := s.hs[req.Path]
-	return h
-}
-
-func (s *xdpServer) Serve(addr string) error {
+// Serve start serve at addr, addr must be valid *Address
+func (s *Server) Serve(addr string) error {
 	ad, err := ParseAddress(addr)
 	if err != nil {
 		return err
@@ -139,14 +65,14 @@ func (s *xdpServer) Serve(addr string) error {
 		return err
 	}
 
-	conn := newConnection("tcp", ap.Addr)
+	conn := newConnection(ap.Addr)
 	if err := conn.Connect(); err != nil {
 		return err
 	}
 	s.conn = conn
 	go conn.recv(s.process)
 
-	if err = s.call(&api.HandshakeRequest{
+	if err = s.call(api.Cmd_Handshake, &api.HandshakeRequest{
 		AppID:     s.addr.AppID,
 		AccessKey: ap.AccessKey,
 	}); err != nil {
@@ -156,47 +82,48 @@ func (s *xdpServer) Serve(addr string) error {
 	return nil
 }
 
-func (s *xdpServer) Send(sess *Session, data []byte) error {
-	var dt api.DataTransfer
-	dt.SessionID = sess.SessionID
-	dt.Data = data
-
-	bb := bytes.NewBuffer(nil)
-	if _, err := dt.WriteTo(bb); err != nil {
-		return err
-	}
-
-	var p Packet
-	p.Cmd = api.CmdData
-	p.Data = bb.Bytes()
-	return s.conn.write(&p)
+// Send send data to session client
+func (s *Server) Send(sess *Session, data []byte) error {
+	var sd api.SessionDataBiNotify
+	sd.SessionID = sess.SessionID
+	sd.Data = data
+	return s.push(api.Cmd_SessionData, &sd)
 }
 
-func (s *xdpServer) process(p *Packet) {
+// MultiSend multi send data to session at once
+func (s *Server) MultiSend(sids []string, data []byte) error {
+	var sd api.MultiSessionDataRequest
+	sd.SessionIDs = sids
+	sd.Data = data
+	return s.push(api.Cmd_MultiSessionData, &sd)
+}
+
+func (s *Server) process(p *Packet) {
 	switch p.Cmd {
-	case api.CmdData:
+	case uint32(api.Cmd_SessionData):
 		s.handleData(p)
-	case api.CmdHTTP:
+	case uint32(api.Cmd_SessionHTTP):
 		s.handleHTTP(p)
 	}
 }
 
-func (s *xdpServer) signUrl(vals url.Values) {
+func (s *Server) signURL(vals url.Values) {
 	md5str := fmt.Sprintf("%s%s", vals.Encode(), s.addr.AppSecret)
 	m := md5.New()
 	token := hex.EncodeToString(m.Sum([]byte(md5str)))
 	vals.Set("token", token)
 }
 
+// AccessPoint xcloud return access_point info
 type AccessPoint struct {
 	Addr      string `json:"addr"`
 	AccessKey string `json:"access_key"`
 }
 
-func (s *xdpServer) getAccessPoint() (*AccessPoint, error) {
+func (s *Server) getAccessPoint() (*AccessPoint, error) {
 	values := make(url.Values)
 	values.Set("appid", s.addr.AppID)
-	s.signUrl(values)
+	s.signURL(values)
 	url := fmt.Sprintf("%s%s?%s", XCloudAddr, APIAccessPoint, values.Encode())
 
 	resp, err := http.Get(url)
@@ -224,35 +151,35 @@ func (s *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	return &ret.AccessPoint, nil
 }
 
-func (s *xdpServer) call(sa api.ServerAPI) error {
-	bb := bytes.NewBuffer(nil)
-	if _, err := sa.WriteTo(bb); err != nil {
+func (s *Server) call(cmd api.Cmd, sa proto.Message) error {
+	data, err := proto.Marshal(sa)
+	if err != nil {
 		return err
 	}
 
 	var p Packet
-	p.Cmd = uint32(sa.Cmd())
-	p.Data = bb.Bytes()
-	_, err := s.conn.Call(context.Background(), &p)
+	p.Cmd = uint32(cmd)
+	p.Data = data
+	_, err = s.conn.Call(context.Background(), &p)
 	return err
 }
 
-func (s *xdpServer) push(sa api.ServerAPI) error {
-	bb := bytes.NewBuffer(nil)
-	if _, err := sa.WriteTo(bb); err != nil {
+func (s *Server) push(cmd api.Cmd, sa proto.Message) error {
+	data, err := proto.Marshal(sa)
+	if err != nil {
 		return err
 	}
 
 	var p Packet
-	p.Cmd = uint32(sa.Cmd())
-	p.Data = bb.Bytes()
+	p.Cmd = uint32(cmd)
+	p.Data = data
 	return s.conn.write(&p)
 }
 
-func (s *xdpServer) handleData(p *Packet) {
-	bb := bytes.NewBuffer(p.Data)
-	var dt api.DataTransfer
-	if _, err := dt.ReadFrom(bb); err != nil {
+func (s *Server) handleData(p *Packet) {
+	var dt api.SessionDataBiNotify
+	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+		s.opts.Logger.Debug("unmarshal SessionDataBiNotify error:%s", err)
 		return
 	}
 
@@ -262,15 +189,13 @@ func (s *xdpServer) handleData(p *Packet) {
 
 	var req Request
 	req.Session = sess
-	if h := s.getHandler(&req); h != nil {
-		h.Serve(&req)
-	}
+	s.opts.Handler.Serve(&req)
 }
 
-func (s *xdpServer) handleHTTP(p *Packet) {
-	bb := bytes.NewBuffer(p.Data)
-	var dt api.HTTPRequest
-	if _, err := dt.ReadFrom(bb); err != nil {
+func (s *Server) handleHTTP(p *Packet) {
+	var dt api.SessionHTTPNotify
+	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+		s.opts.Logger.Debug("unmarshal SessionHTTPNotify error:%s", err)
 		return
 	}
 
@@ -281,9 +206,5 @@ func (s *xdpServer) handleHTTP(p *Packet) {
 
 	var req HTTPRequest
 	req.Path = dt.Path
-	if h := s.getHTTPHandler(&req); h != nil {
-		h.ServeHTTP(res, &req)
-	} else {
-		res.WriteHeader(http.StatusNotFound)
-	}
+	s.opts.HTTPHandler.ServeHTTP(res, &req)
 }

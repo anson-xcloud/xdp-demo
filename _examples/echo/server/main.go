@@ -8,9 +8,10 @@ import (
 )
 
 func main() {
+	xdp.HTTPHandleFunc("/", httpEcho)
+	xdp.HandleFunc("", tcpEcho)
+
 	svr := xdp.NewServer()
-	svr.HTTPHandleFunc("/get", httpEcho)
-	svr.HandleFunc("", tcpEcho)
 	if err := svr.Serve("1:test"); err != nil {
 		fmt.Println(err)
 	}
@@ -18,7 +19,11 @@ func main() {
 }
 
 func httpEcho(res xdp.HTTPResponseWriter, req *xdp.HTTPRequest) {
-	echo := fmt.Sprintf("echo %s", time.Now().Format(time.RFC3339))
+	echo := fmt.Sprintf("%s : %s %v",
+		time.Now().Format(time.RFC3339),
+		req.Path,
+		req.Headers,
+	)
 
 	res.Write([]byte(echo))
 }

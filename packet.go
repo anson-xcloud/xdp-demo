@@ -5,8 +5,11 @@ import (
 	"io"
 )
 
-var packetbo = binary.LittleEndian
+var (
+	packetbo = binary.LittleEndian
+)
 
+// Packet xcloud packet define
 // TODO
 // adjust like http header
 // Proto      string // XDP/1

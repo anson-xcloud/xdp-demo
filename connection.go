@@ -6,6 +6,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const flagRPCResponse = 0x1
@@ -21,27 +22,29 @@ func newCaller() *caller {
 	return c
 }
 
+// Connection tcp connection
 type Connection struct {
 	Logger
 
 	mtx sync.Mutex
 
-	network, address string
-	nc               net.Conn
+	address string
+	nc      net.Conn
 
 	rpcid   uint32
 	callers map[uint32]*caller
 }
 
-func newConnection(network, address string) *Connection {
+func newConnection(address string) *Connection {
 	conn := new(Connection)
-	conn.network, conn.address = network, address
+	conn.address = address
 	conn.callers = make(map[uint32]*caller)
 	return conn
 }
 
+// Connect do connect
 func (c *Connection) Connect() error {
-	nc, err := net.Dial(c.network, c.address)
+	nc, err := net.Dial("tcp", c.address)
 	if err != nil {
 		return err
 	}
@@ -58,7 +61,7 @@ func (c *Connection) recv(handler func(p *Packet)) {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				continue
 			}
-			c.Errorf("read %s packet error:%s", c.nc.RemoteAddr(), err)
+			c.Error("read %s packet error:%s", c.nc.RemoteAddr(), err)
 			break
 		}
 
@@ -66,7 +69,7 @@ func (c *Connection) recv(handler func(p *Packet)) {
 			c.mtx.Lock()
 			if ctx, ok := c.callers[p.ID]; !ok {
 				c.mtx.Unlock()
-				c.Errorf("%s unexisted rpc return %d", c.nc.RemoteAddr(), p.ID)
+				c.Error("%s unexisted rpc return %d", c.nc.RemoteAddr(), p.ID)
 			} else {
 				delete(c.callers, p.ID)
 				c.mtx.Unlock()
@@ -78,6 +81,7 @@ func (c *Connection) recv(handler func(p *Packet)) {
 	}
 }
 
+// Close do close connection
 func (c *Connection) Close() {
 	nc := c.nc
 	if nc != nil {
@@ -86,6 +90,7 @@ func (c *Connection) Close() {
 	}
 }
 
+// Call do rpc call
 func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 	caller := newCaller()
 	caller.id = atomic.AddUint32(&c.rpcid, 1)
@@ -98,6 +103,7 @@ func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 		return nil, err
 	}
 
+	tctx, _ := context.WithTimeout(ctx, time.Second*30)
 	select {
 	case p, ok := <-caller.ch:
 		if !ok {
@@ -107,11 +113,11 @@ func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 			return nil, errors.New("response ec")
 		}
 		return p, nil
-	case <-ctx.Done():
+	case <-tctx.Done():
 		c.mtx.Lock()
 		delete(c.callers, caller.id)
 		c.mtx.Unlock()
-		return nil, errors.New("timeout")
+		return nil, ErrTimeout
 	}
 }
 
