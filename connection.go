@@ -31,19 +31,21 @@ type Connection struct {
 	address string
 	nc      net.Conn
 
+	cec error //close error
+
 	rpcid   uint32
 	callers map[uint32]*caller
 }
 
-func newConnection(address string) *Connection {
+func newConnection() *Connection {
 	conn := new(Connection)
-	conn.address = address
 	conn.callers = make(map[uint32]*caller)
 	return conn
 }
 
 // Connect do connect
-func (c *Connection) Connect() error {
+func (c *Connection) Connect(addr string) error {
+	c.address = addr
 	nc, err := net.Dial("tcp", c.address)
 	if err != nil {
 		return err
@@ -53,7 +55,7 @@ func (c *Connection) Connect() error {
 	return nil
 }
 
-func (c *Connection) recv(handler func(p *Packet)) {
+func (c *Connection) recv(handler func(p *Packet)) error {
 	nc := c.nc
 	for {
 		var p Packet
@@ -61,15 +63,16 @@ func (c *Connection) recv(handler func(p *Packet)) {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				continue
 			}
-			c.Error("read %s packet error:%s", c.nc.RemoteAddr(), err)
-			break
+
+			c.Error("read %s packet error:%s", nc.RemoteAddr(), err)
+			return err
 		}
 
 		if p.Flag&flagRPCResponse != 0 {
 			c.mtx.Lock()
 			if ctx, ok := c.callers[p.ID]; !ok {
 				c.mtx.Unlock()
-				c.Error("%s unexisted rpc return %d", c.nc.RemoteAddr(), p.ID)
+				c.Error("%s unexisted rpc return %d", nc.RemoteAddr(), p.ID)
 			} else {
 				delete(c.callers, p.ID)
 				c.mtx.Unlock()
@@ -82,10 +85,11 @@ func (c *Connection) recv(handler func(p *Packet)) {
 }
 
 // Close do close connection
-func (c *Connection) Close() {
+func (c *Connection) Close(err error) {
+	c.cec = err
+
 	nc := c.nc
 	if nc != nil {
-		c.nc = nil
 		nc.Close()
 	}
 }

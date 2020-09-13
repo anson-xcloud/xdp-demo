@@ -13,9 +13,8 @@ func main() {
 
 	svr := xdp.NewServer()
 	if err := svr.Serve("1:test"); err != nil {
-		fmt.Println(err)
+		svr.Logger().Error("%s", err)
 	}
-	time.Sleep(time.Hour)
 }
 
 func httpEcho(res xdp.HTTPResponseWriter, req *xdp.HTTPRequest) {

@@ -55,6 +55,11 @@ func NewServer(opt ...Option) *Server {
 	return svr
 }
 
+// Logger get server Logger
+func (s *Server) Logger() Logger {
+	return s.opts.Logger
+}
+
 // Serve start serve at addr, addr must be valid *Address
 func (s *Server) Serve(addr string) error {
 	ad, err := ParseAddress(addr)
@@ -68,21 +73,23 @@ func (s *Server) Serve(addr string) error {
 		return err
 	}
 
-	conn := newConnection(ap.Addr)
-	if err := conn.Connect(); err != nil {
+	conn := newConnection()
+	conn.Logger = s.opts.Logger
+	if err := conn.Connect(ap.Addr); err != nil {
 		return err
 	}
 	s.conn = conn
-	go conn.recv(s.process)
 
-	if err = s.call(api.Cmd_Handshake, &api.HandshakeRequest{
-		AppID:     s.addr.AppID,
-		AccessKey: ap.AccessKey,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	go func() {
+		if err = s.call(api.Cmd_Handshake, &api.HandshakeRequest{
+			AppID:     s.addr.AppID,
+			AccessKey: ap.AccessKey,
+		}); err != nil {
+			conn.Close(err)
+			return
+		}
+	}()
+	return conn.recv(s.process)
 }
 
 // Send send data to session client
