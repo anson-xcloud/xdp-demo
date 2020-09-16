@@ -3,6 +3,7 @@ package xdp
 import (
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/anson-xcloud/xdp-demo/api"
 	"github.com/golang/protobuf/proto"
@@ -13,6 +14,8 @@ type Request struct {
 	Session *Session
 	Path    string
 	Data    []byte
+
+	reqTime time.Time
 }
 
 // HTTPRequest http request info
@@ -39,6 +42,8 @@ type httpResponseWriter struct {
 	resp api.SessionHTTPNotifyResponse
 
 	writed int32
+
+	req *HTTPRequest
 }
 
 func (r *httpResponseWriter) Write(data []byte) {
@@ -60,6 +65,11 @@ func (r *httpResponseWriter) write() error {
 	if !atomic.CompareAndSwapInt32(&r.writed, 0, 1) {
 		return ErrTwiceWriteHTTPResponse
 	}
+
+	defer func() {
+		r.sv.Logger().Info("http %s %s status %v cost %0.3fs", r.req.Method, r.req.Path,
+			r.resp.Code, time.Since(r.req.reqTime).Seconds())
+	}()
 
 	data, err := proto.Marshal(&r.resp)
 	if err != nil {

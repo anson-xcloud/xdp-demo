@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/anson-xcloud/xdp-demo/api"
 	"github.com/golang/protobuf/proto"
@@ -237,16 +238,18 @@ func (s *Server) handleHTTP(p *Packet) {
 		return
 	}
 
-	res := &httpResponseWriter{}
-	res.p = p
-	res.sv = s
-	res.writed = 0
-
 	var req HTTPRequest
 	req.Session = s.sessMgr.Get(dt.SessionID)
 	req.Method = dt.Method
 	req.Path = dt.Path
 	req.Forms = dt.Forms
 	req.Data = dt.Body
+	req.reqTime = time.Now()
+
+	res := &httpResponseWriter{}
+	res.p = p
+	res.sv = s
+	res.writed = 0
+	res.req = &req
 	s.opts.HTTPHandler.ServeHTTP(res, &req)
 }
