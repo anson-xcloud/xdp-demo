@@ -12,8 +12,6 @@ type Option func(*Options)
 type Options struct {
 	Handler Handler
 
-	HTTPHandler HTTPHandler
-
 	Logger Logger
 
 	// Config xcloud config
@@ -21,9 +19,8 @@ type Options struct {
 }
 
 var defaultOptions = Options{
-	Handler:     defaultServeMux,
-	HTTPHandler: defaultServeMux,
-	Logger:      new(fmtLogger),
+	Handler: defaultServeMux,
+	Logger:  new(fmtLogger),
 }
 
 // WithHandler set handler
@@ -31,14 +28,6 @@ var defaultOptions = Options{
 func WithHandler(h Handler) Option {
 	return func(opts *Options) {
 		opts.Handler = h
-	}
-}
-
-// WithHTTPHandler set http handler
-// if dont set, default use *ServeMux
-func WithHTTPHandler(h HTTPHandler) Option {
-	return func(opts *Options) {
-		opts.HTTPHandler = h
 	}
 }
 

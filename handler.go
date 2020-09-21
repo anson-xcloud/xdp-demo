@@ -3,33 +3,93 @@ package xdp
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/anson-xcloud/xdp-demo/api"
+	"github.com/golang/protobuf/proto"
 )
 
 // Handler tcp/udp raw data handler
 type Handler interface {
 	ServeConnect(*Session)
 
-	Serve(*Request)
+	Serve(ResponseWriter, *Request)
 
 	ServeClose(*Session)
 }
 
-// HTTPHandler http data handler
-type HTTPHandler interface {
-	ServeHTTP(HTTPResponseWriter, *HTTPRequest)
-}
+type handlerServeFunc func(ResponseWriter, *Request)
 
-type handlerServeFunc func(*Request)
-
-func (f handlerServeFunc) Serve(req *Request) {
-	f(req)
-}
-
-// HTTPHandlerFunc http handler for func
-type HTTPHandlerFunc func(HTTPResponseWriter, *HTTPRequest)
-
-func (f HTTPHandlerFunc) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
+func (f handlerServeFunc) Serve(res ResponseWriter, req *Request) {
 	f(res, req)
+}
+
+// Request request data info
+type Request struct {
+	Session *Session
+
+	Api     string
+	Headers map[string]string
+	Body    []byte
+
+	reqTime time.Time
+}
+
+// ResponseWriter response write
+type ResponseWriter interface {
+	WriteStatus(statusCode int)
+
+	Write(data []byte)
+}
+
+type responseWriter struct {
+	p *Packet
+
+	sv *Server
+
+	resp api.SessionOnRecvNotifyResponse
+
+	writed int32
+
+	req *Request
+}
+
+func (r *responseWriter) Write(data []byte) {
+	if r.resp.Status == 0 {
+		r.resp.Status = uint32(http.StatusOK)
+	}
+	r.resp.Body = data
+
+	r.write()
+}
+
+func (r *responseWriter) WriteStatus(statusCode int) {
+	r.resp.Status = uint32(statusCode)
+
+	r.write()
+}
+
+func (r *responseWriter) write() error {
+	if !atomic.CompareAndSwapInt32(&r.writed, 0, 1) {
+		return ErrTwiceWriteHTTPResponse
+	}
+
+	defer func() {
+		r.sv.Logger().Info("http %s status %v cost %0.3fs", r.req.Api,
+			r.resp.Status, time.Since(r.req.reqTime).Seconds())
+	}()
+
+	data, err := proto.Marshal(&r.resp)
+	if err != nil {
+		return err
+	}
+
+	if r.p.ID != 0 {
+		r.p.Flag |= flagRPCResponse
+	}
+	r.p.Data = data
+	return r.sv.conn.write(r.p)
 }
 
 // ServeMux support multi handler based on path
@@ -39,14 +99,12 @@ type ServeMux struct {
 
 	onConnect, onClose func(*Session)
 	hs                 map[string]handlerServeFunc
-	hhs                map[string]HTTPHandler
 }
 
 // NewServeMux create *ServeMux
 func NewServeMux() *ServeMux {
 	sm := new(ServeMux)
 	sm.hs = make(map[string]handlerServeFunc)
-	sm.hhs = make(map[string]HTTPHandler)
 	return sm
 }
 
@@ -56,22 +114,6 @@ func (s *ServeMux) HandleFunc(pattern string, h handlerServeFunc) {
 	defer s.mtx.Unlock()
 
 	s.hs[pattern] = h
-}
-
-// HTTPHandleFunc register http handler func
-func (s *ServeMux) HTTPHandleFunc(pattern string, hh HTTPHandlerFunc) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hhs[pattern] = hh
-}
-
-// HTTPHandle register http handler
-func (s *ServeMux) HTTPHandle(pattern string, hh HTTPHandler) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hhs[pattern] = hh
 }
 
 // HandleConnect register onConnect
@@ -90,19 +132,11 @@ func (s *ServeMux) HandleClose(fn func(*Session)) {
 	s.onClose = fn
 }
 
-func (s *ServeMux) getHTTPHandler(req *HTTPRequest) HTTPHandler {
-	s.mtx.RLock()
-	defer s.mtx.RUnlock()
-
-	hh := s.hhs[req.Path]
-	return hh
-}
-
 func (s *ServeMux) getHandler(req *Request) handlerServeFunc {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	h := s.hs[req.Path]
+	h := s.hs[req.Api]
 	return h
 }
 
@@ -118,9 +152,12 @@ func (s *ServeMux) ServeConnect(sess *Session) {
 }
 
 // Serve implement Handler.Serve
-func (s *ServeMux) Serve(req *Request) {
+func (s *ServeMux) Serve(res ResponseWriter, req *Request) {
 	if h := s.getHandler(req); h != nil {
-		h.Serve(req)
+		h.Serve(res, req)
+	} else {
+		// TODO error log
+		// res.WriteStatus(http.StatusNotFound)
 	}
 }
 
@@ -135,30 +172,11 @@ func (s *ServeMux) ServeClose(sess *Session) {
 	}
 }
 
-// ServeHTTP implement HTTPHandler.ServeHTTP
-func (s *ServeMux) ServeHTTP(res HTTPResponseWriter, req *HTTPRequest) {
-	if h := s.getHTTPHandler(req); h != nil {
-		h.ServeHTTP(res, req)
-	} else {
-		res.WriteHeader(http.StatusNotFound)
-	}
-}
-
 var defaultServeMux = NewServeMux()
 
 // HandleFunc call defaultServeMux.HandleFunc
 func HandleFunc(pattern string, h handlerServeFunc) {
 	defaultServeMux.HandleFunc(pattern, h)
-}
-
-// HTTPHandleFunc call defaultServeMux.HTTPHandleFunc
-func HTTPHandleFunc(pattern string, hh HTTPHandlerFunc) {
-	defaultServeMux.HTTPHandleFunc(pattern, hh)
-}
-
-// HTTPHandle call defaultServeMux.HTTPHandle
-func HTTPHandle(pattern string, hh HTTPHandler) {
-	defaultServeMux.HTTPHandle(pattern, hh)
 }
 
 // HandleConnect call defaultServeMux.HandleConnect

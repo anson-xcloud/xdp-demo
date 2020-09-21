@@ -23,39 +23,36 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 type Cmd int32
 
 const (
-	Cmd_None Cmd = 0
-	// local -> xcloud
-	Cmd_Handshake        Cmd = 1
-	Cmd_MultiSessionData Cmd = 2
-	// xcloud -> local
-	Cmd_SessionHTTP     Cmd = 20
-	Cmd_SessionConnect  Cmd = 21
-	Cmd_SessionClose    Cmd = 22
-	Cmd_SessionUserBind Cmd = 23
-	// xcloud <-> local
-	Cmd_SessionData Cmd = 40
+	Cmd_CmdNone             Cmd = 0
+	Cmd_CmdHandshake        Cmd = 1
+	Cmd_CmdSessionOnConnect Cmd = 10
+	Cmd_CmdSessionOnRecv    Cmd = 11
+	Cmd_CmdSessionOnClose   Cmd = 12
+	Cmd_CmdSessionSend      Cmd = 20
+	Cmd_CmdSessionMultiSend Cmd = 21
+	Cmd_CmdSessionClose     Cmd = 22
 )
 
 var Cmd_name = map[int32]string{
-	0:  "None",
-	1:  "Handshake",
-	2:  "MultiSessionData",
-	20: "SessionHTTP",
-	21: "SessionConnect",
-	22: "SessionClose",
-	23: "SessionUserBind",
-	40: "SessionData",
+	0:  "CmdNone",
+	1:  "CmdHandshake",
+	10: "CmdSessionOnConnect",
+	11: "CmdSessionOnRecv",
+	12: "CmdSessionOnClose",
+	20: "CmdSessionSend",
+	21: "CmdSessionMultiSend",
+	22: "CmdSessionClose",
 }
 
 var Cmd_value = map[string]int32{
-	"None":             0,
-	"Handshake":        1,
-	"MultiSessionData": 2,
-	"SessionHTTP":      20,
-	"SessionConnect":   21,
-	"SessionClose":     22,
-	"SessionUserBind":  23,
-	"SessionData":      40,
+	"CmdNone":             0,
+	"CmdHandshake":        1,
+	"CmdSessionOnConnect": 10,
+	"CmdSessionOnRecv":    11,
+	"CmdSessionOnClose":   12,
+	"CmdSessionSend":      20,
+	"CmdSessionMultiSend": 21,
+	"CmdSessionClose":     22,
 }
 
 func (x Cmd) String() string {
@@ -121,126 +118,118 @@ func (m *HandshakeRequest) GetConfig() string {
 	return ""
 }
 
-type MultiSessionDataRequest struct {
-	SessionIDs           []string `protobuf:"bytes,1,rep,name=sessionIDs,proto3" json:"sessionIDs,omitempty"`
-	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+type SessionOnConnectNotify struct {
+	Sid                  string   `protobuf:"bytes,1,opt,name=sid,proto3" json:"sid,omitempty"`
+	OpenID               string   `protobuf:"bytes,2,opt,name=openID,proto3" json:"openID,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *MultiSessionDataRequest) Reset()         { *m = MultiSessionDataRequest{} }
-func (m *MultiSessionDataRequest) String() string { return proto.CompactTextString(m) }
-func (*MultiSessionDataRequest) ProtoMessage()    {}
-func (*MultiSessionDataRequest) Descriptor() ([]byte, []int) {
+func (m *SessionOnConnectNotify) Reset()         { *m = SessionOnConnectNotify{} }
+func (m *SessionOnConnectNotify) String() string { return proto.CompactTextString(m) }
+func (*SessionOnConnectNotify) ProtoMessage()    {}
+func (*SessionOnConnectNotify) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
 }
 
-func (m *MultiSessionDataRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_MultiSessionDataRequest.Unmarshal(m, b)
+func (m *SessionOnConnectNotify) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionOnConnectNotify.Unmarshal(m, b)
 }
-func (m *MultiSessionDataRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_MultiSessionDataRequest.Marshal(b, m, deterministic)
+func (m *SessionOnConnectNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionOnConnectNotify.Marshal(b, m, deterministic)
 }
-func (m *MultiSessionDataRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MultiSessionDataRequest.Merge(m, src)
+func (m *SessionOnConnectNotify) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionOnConnectNotify.Merge(m, src)
 }
-func (m *MultiSessionDataRequest) XXX_Size() int {
-	return xxx_messageInfo_MultiSessionDataRequest.Size(m)
+func (m *SessionOnConnectNotify) XXX_Size() int {
+	return xxx_messageInfo_SessionOnConnectNotify.Size(m)
 }
-func (m *MultiSessionDataRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_MultiSessionDataRequest.DiscardUnknown(m)
+func (m *SessionOnConnectNotify) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionOnConnectNotify.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_MultiSessionDataRequest proto.InternalMessageInfo
+var xxx_messageInfo_SessionOnConnectNotify proto.InternalMessageInfo
 
-func (m *MultiSessionDataRequest) GetSessionIDs() []string {
+func (m *SessionOnConnectNotify) GetSid() string {
 	if m != nil {
-		return m.SessionIDs
+		return m.Sid
 	}
-	return nil
+	return ""
 }
 
-func (m *MultiSessionDataRequest) GetData() []byte {
+func (m *SessionOnConnectNotify) GetOpenID() string {
 	if m != nil {
-		return m.Data
+		return m.OpenID
 	}
-	return nil
+	return ""
 }
 
-type SessionHTTPNotify struct {
-	SessionID            string            `protobuf:"bytes,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	Method               string            `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
-	Path                 string            `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
-	Forms                map[string]string `protobuf:"bytes,4,rep,name=forms,proto3" json:"forms,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Body                 []byte            `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+type SessionOnRecvNotify struct {
+	Sid                  string            `protobuf:"bytes,1,opt,name=sid,proto3" json:"sid,omitempty"`
+	Api                  string            `protobuf:"bytes,2,opt,name=api,proto3" json:"api,omitempty"`
+	Headers              map[string]string `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Body                 []byte            `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
 	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *SessionHTTPNotify) Reset()         { *m = SessionHTTPNotify{} }
-func (m *SessionHTTPNotify) String() string { return proto.CompactTextString(m) }
-func (*SessionHTTPNotify) ProtoMessage()    {}
-func (*SessionHTTPNotify) Descriptor() ([]byte, []int) {
+func (m *SessionOnRecvNotify) Reset()         { *m = SessionOnRecvNotify{} }
+func (m *SessionOnRecvNotify) String() string { return proto.CompactTextString(m) }
+func (*SessionOnRecvNotify) ProtoMessage()    {}
+func (*SessionOnRecvNotify) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
 
-func (m *SessionHTTPNotify) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionHTTPNotify.Unmarshal(m, b)
+func (m *SessionOnRecvNotify) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionOnRecvNotify.Unmarshal(m, b)
 }
-func (m *SessionHTTPNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionHTTPNotify.Marshal(b, m, deterministic)
+func (m *SessionOnRecvNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionOnRecvNotify.Marshal(b, m, deterministic)
 }
-func (m *SessionHTTPNotify) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionHTTPNotify.Merge(m, src)
+func (m *SessionOnRecvNotify) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionOnRecvNotify.Merge(m, src)
 }
-func (m *SessionHTTPNotify) XXX_Size() int {
-	return xxx_messageInfo_SessionHTTPNotify.Size(m)
+func (m *SessionOnRecvNotify) XXX_Size() int {
+	return xxx_messageInfo_SessionOnRecvNotify.Size(m)
 }
-func (m *SessionHTTPNotify) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionHTTPNotify.DiscardUnknown(m)
+func (m *SessionOnRecvNotify) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionOnRecvNotify.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SessionHTTPNotify proto.InternalMessageInfo
+var xxx_messageInfo_SessionOnRecvNotify proto.InternalMessageInfo
 
-func (m *SessionHTTPNotify) GetSessionID() string {
+func (m *SessionOnRecvNotify) GetSid() string {
 	if m != nil {
-		return m.SessionID
+		return m.Sid
 	}
 	return ""
 }
 
-func (m *SessionHTTPNotify) GetMethod() string {
+func (m *SessionOnRecvNotify) GetApi() string {
 	if m != nil {
-		return m.Method
+		return m.Api
 	}
 	return ""
 }
 
-func (m *SessionHTTPNotify) GetPath() string {
+func (m *SessionOnRecvNotify) GetHeaders() map[string]string {
 	if m != nil {
-		return m.Path
-	}
-	return ""
-}
-
-func (m *SessionHTTPNotify) GetForms() map[string]string {
-	if m != nil {
-		return m.Forms
+		return m.Headers
 	}
 	return nil
 }
 
-func (m *SessionHTTPNotify) GetBody() []byte {
+func (m *SessionOnRecvNotify) GetBody() []byte {
 	if m != nil {
 		return m.Body
 	}
 	return nil
 }
 
-type SessionHTTPNotifyResponse struct {
-	Code                 uint32            `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+type SessionOnRecvNotifyResponse struct {
+	Status               uint32            `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
 	Headers              map[string]string `protobuf:"bytes,2,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	Body                 []byte            `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
@@ -248,226 +237,179 @@ type SessionHTTPNotifyResponse struct {
 	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *SessionHTTPNotifyResponse) Reset()         { *m = SessionHTTPNotifyResponse{} }
-func (m *SessionHTTPNotifyResponse) String() string { return proto.CompactTextString(m) }
-func (*SessionHTTPNotifyResponse) ProtoMessage()    {}
-func (*SessionHTTPNotifyResponse) Descriptor() ([]byte, []int) {
+func (m *SessionOnRecvNotifyResponse) Reset()         { *m = SessionOnRecvNotifyResponse{} }
+func (m *SessionOnRecvNotifyResponse) String() string { return proto.CompactTextString(m) }
+func (*SessionOnRecvNotifyResponse) ProtoMessage()    {}
+func (*SessionOnRecvNotifyResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
 
-func (m *SessionHTTPNotifyResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionHTTPNotifyResponse.Unmarshal(m, b)
+func (m *SessionOnRecvNotifyResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionOnRecvNotifyResponse.Unmarshal(m, b)
 }
-func (m *SessionHTTPNotifyResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionHTTPNotifyResponse.Marshal(b, m, deterministic)
+func (m *SessionOnRecvNotifyResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionOnRecvNotifyResponse.Marshal(b, m, deterministic)
 }
-func (m *SessionHTTPNotifyResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionHTTPNotifyResponse.Merge(m, src)
+func (m *SessionOnRecvNotifyResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionOnRecvNotifyResponse.Merge(m, src)
 }
-func (m *SessionHTTPNotifyResponse) XXX_Size() int {
-	return xxx_messageInfo_SessionHTTPNotifyResponse.Size(m)
+func (m *SessionOnRecvNotifyResponse) XXX_Size() int {
+	return xxx_messageInfo_SessionOnRecvNotifyResponse.Size(m)
 }
-func (m *SessionHTTPNotifyResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionHTTPNotifyResponse.DiscardUnknown(m)
+func (m *SessionOnRecvNotifyResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionOnRecvNotifyResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SessionHTTPNotifyResponse proto.InternalMessageInfo
+var xxx_messageInfo_SessionOnRecvNotifyResponse proto.InternalMessageInfo
 
-func (m *SessionHTTPNotifyResponse) GetCode() uint32 {
+func (m *SessionOnRecvNotifyResponse) GetStatus() uint32 {
 	if m != nil {
-		return m.Code
+		return m.Status
 	}
 	return 0
 }
 
-func (m *SessionHTTPNotifyResponse) GetHeaders() map[string]string {
+func (m *SessionOnRecvNotifyResponse) GetHeaders() map[string]string {
 	if m != nil {
 		return m.Headers
 	}
 	return nil
 }
 
-func (m *SessionHTTPNotifyResponse) GetBody() []byte {
+func (m *SessionOnRecvNotifyResponse) GetBody() []byte {
 	if m != nil {
 		return m.Body
 	}
 	return nil
 }
 
-type SessionConnectNotify struct {
-	SessionID            string   `protobuf:"bytes,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	OpenID               string   `protobuf:"bytes,2,opt,name=openID,proto3" json:"openID,omitempty"`
+type SessionOnCloseNotify struct {
+	Sid                  string   `protobuf:"bytes,1,opt,name=sid,proto3" json:"sid,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *SessionConnectNotify) Reset()         { *m = SessionConnectNotify{} }
-func (m *SessionConnectNotify) String() string { return proto.CompactTextString(m) }
-func (*SessionConnectNotify) ProtoMessage()    {}
-func (*SessionConnectNotify) Descriptor() ([]byte, []int) {
+func (m *SessionOnCloseNotify) Reset()         { *m = SessionOnCloseNotify{} }
+func (m *SessionOnCloseNotify) String() string { return proto.CompactTextString(m) }
+func (*SessionOnCloseNotify) ProtoMessage()    {}
+func (*SessionOnCloseNotify) Descriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
 
-func (m *SessionConnectNotify) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionConnectNotify.Unmarshal(m, b)
+func (m *SessionOnCloseNotify) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionOnCloseNotify.Unmarshal(m, b)
 }
-func (m *SessionConnectNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionConnectNotify.Marshal(b, m, deterministic)
+func (m *SessionOnCloseNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionOnCloseNotify.Marshal(b, m, deterministic)
 }
-func (m *SessionConnectNotify) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionConnectNotify.Merge(m, src)
+func (m *SessionOnCloseNotify) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionOnCloseNotify.Merge(m, src)
 }
-func (m *SessionConnectNotify) XXX_Size() int {
-	return xxx_messageInfo_SessionConnectNotify.Size(m)
+func (m *SessionOnCloseNotify) XXX_Size() int {
+	return xxx_messageInfo_SessionOnCloseNotify.Size(m)
 }
-func (m *SessionConnectNotify) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionConnectNotify.DiscardUnknown(m)
+func (m *SessionOnCloseNotify) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionOnCloseNotify.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SessionConnectNotify proto.InternalMessageInfo
+var xxx_messageInfo_SessionOnCloseNotify proto.InternalMessageInfo
 
-func (m *SessionConnectNotify) GetSessionID() string {
+func (m *SessionOnCloseNotify) GetSid() string {
 	if m != nil {
-		return m.SessionID
+		return m.Sid
 	}
 	return ""
 }
 
-func (m *SessionConnectNotify) GetOpenID() string {
-	if m != nil {
-		return m.OpenID
-	}
-	return ""
-}
-
-type SessionCloseNotify struct {
-	SessionID            string   `protobuf:"bytes,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SessionCloseNotify) Reset()         { *m = SessionCloseNotify{} }
-func (m *SessionCloseNotify) String() string { return proto.CompactTextString(m) }
-func (*SessionCloseNotify) ProtoMessage()    {}
-func (*SessionCloseNotify) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
-}
-
-func (m *SessionCloseNotify) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionCloseNotify.Unmarshal(m, b)
-}
-func (m *SessionCloseNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionCloseNotify.Marshal(b, m, deterministic)
-}
-func (m *SessionCloseNotify) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionCloseNotify.Merge(m, src)
-}
-func (m *SessionCloseNotify) XXX_Size() int {
-	return xxx_messageInfo_SessionCloseNotify.Size(m)
-}
-func (m *SessionCloseNotify) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionCloseNotify.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SessionCloseNotify proto.InternalMessageInfo
-
-func (m *SessionCloseNotify) GetSessionID() string {
-	if m != nil {
-		return m.SessionID
-	}
-	return ""
-}
-
-type SessionUserBindNotify struct {
-	SessionID            string   `protobuf:"bytes,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
-	OpenID               string   `protobuf:"bytes,2,opt,name=openID,proto3" json:"openID,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *SessionUserBindNotify) Reset()         { *m = SessionUserBindNotify{} }
-func (m *SessionUserBindNotify) String() string { return proto.CompactTextString(m) }
-func (*SessionUserBindNotify) ProtoMessage()    {}
-func (*SessionUserBindNotify) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
-}
-
-func (m *SessionUserBindNotify) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionUserBindNotify.Unmarshal(m, b)
-}
-func (m *SessionUserBindNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionUserBindNotify.Marshal(b, m, deterministic)
-}
-func (m *SessionUserBindNotify) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionUserBindNotify.Merge(m, src)
-}
-func (m *SessionUserBindNotify) XXX_Size() int {
-	return xxx_messageInfo_SessionUserBindNotify.Size(m)
-}
-func (m *SessionUserBindNotify) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionUserBindNotify.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_SessionUserBindNotify proto.InternalMessageInfo
-
-func (m *SessionUserBindNotify) GetSessionID() string {
-	if m != nil {
-		return m.SessionID
-	}
-	return ""
-}
-
-func (m *SessionUserBindNotify) GetOpenID() string {
-	if m != nil {
-		return m.OpenID
-	}
-	return ""
-}
-
-type SessionDataBiNotify struct {
-	SessionID            string   `protobuf:"bytes,1,opt,name=sessionID,proto3" json:"sessionID,omitempty"`
+type SessionSendRequest struct {
+	Sid                  string   `protobuf:"bytes,1,opt,name=sid,proto3" json:"sid,omitempty"`
 	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *SessionDataBiNotify) Reset()         { *m = SessionDataBiNotify{} }
-func (m *SessionDataBiNotify) String() string { return proto.CompactTextString(m) }
-func (*SessionDataBiNotify) ProtoMessage()    {}
-func (*SessionDataBiNotify) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
+func (m *SessionSendRequest) Reset()         { *m = SessionSendRequest{} }
+func (m *SessionSendRequest) String() string { return proto.CompactTextString(m) }
+func (*SessionSendRequest) ProtoMessage()    {}
+func (*SessionSendRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
 }
 
-func (m *SessionDataBiNotify) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_SessionDataBiNotify.Unmarshal(m, b)
+func (m *SessionSendRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionSendRequest.Unmarshal(m, b)
 }
-func (m *SessionDataBiNotify) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_SessionDataBiNotify.Marshal(b, m, deterministic)
+func (m *SessionSendRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionSendRequest.Marshal(b, m, deterministic)
 }
-func (m *SessionDataBiNotify) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SessionDataBiNotify.Merge(m, src)
+func (m *SessionSendRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionSendRequest.Merge(m, src)
 }
-func (m *SessionDataBiNotify) XXX_Size() int {
-	return xxx_messageInfo_SessionDataBiNotify.Size(m)
+func (m *SessionSendRequest) XXX_Size() int {
+	return xxx_messageInfo_SessionSendRequest.Size(m)
 }
-func (m *SessionDataBiNotify) XXX_DiscardUnknown() {
-	xxx_messageInfo_SessionDataBiNotify.DiscardUnknown(m)
+func (m *SessionSendRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionSendRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SessionDataBiNotify proto.InternalMessageInfo
+var xxx_messageInfo_SessionSendRequest proto.InternalMessageInfo
 
-func (m *SessionDataBiNotify) GetSessionID() string {
+func (m *SessionSendRequest) GetSid() string {
 	if m != nil {
-		return m.SessionID
+		return m.Sid
 	}
 	return ""
 }
 
-func (m *SessionDataBiNotify) GetData() []byte {
+func (m *SessionSendRequest) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
+type SessionMultiSendRequest struct {
+	Sids                 []string `protobuf:"bytes,1,rep,name=sids,proto3" json:"sids,omitempty"`
+	Data                 []byte   `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SessionMultiSendRequest) Reset()         { *m = SessionMultiSendRequest{} }
+func (m *SessionMultiSendRequest) String() string { return proto.CompactTextString(m) }
+func (*SessionMultiSendRequest) ProtoMessage()    {}
+func (*SessionMultiSendRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+}
+
+func (m *SessionMultiSendRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SessionMultiSendRequest.Unmarshal(m, b)
+}
+func (m *SessionMultiSendRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SessionMultiSendRequest.Marshal(b, m, deterministic)
+}
+func (m *SessionMultiSendRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SessionMultiSendRequest.Merge(m, src)
+}
+func (m *SessionMultiSendRequest) XXX_Size() int {
+	return xxx_messageInfo_SessionMultiSendRequest.Size(m)
+}
+func (m *SessionMultiSendRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SessionMultiSendRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SessionMultiSendRequest proto.InternalMessageInfo
+
+func (m *SessionMultiSendRequest) GetSids() []string {
+	if m != nil {
+		return m.Sids
+	}
+	return nil
+}
+
+func (m *SessionMultiSendRequest) GetData() []byte {
 	if m != nil {
 		return m.Data
 	}
@@ -477,49 +419,49 @@ func (m *SessionDataBiNotify) GetData() []byte {
 func init() {
 	proto.RegisterEnum("api.Cmd", Cmd_name, Cmd_value)
 	proto.RegisterType((*HandshakeRequest)(nil), "api.HandshakeRequest")
-	proto.RegisterType((*MultiSessionDataRequest)(nil), "api.MultiSessionDataRequest")
-	proto.RegisterType((*SessionHTTPNotify)(nil), "api.SessionHTTPNotify")
-	proto.RegisterMapType((map[string]string)(nil), "api.SessionHTTPNotify.FormsEntry")
-	proto.RegisterType((*SessionHTTPNotifyResponse)(nil), "api.SessionHTTPNotifyResponse")
-	proto.RegisterMapType((map[string]string)(nil), "api.SessionHTTPNotifyResponse.HeadersEntry")
-	proto.RegisterType((*SessionConnectNotify)(nil), "api.SessionConnectNotify")
-	proto.RegisterType((*SessionCloseNotify)(nil), "api.SessionCloseNotify")
-	proto.RegisterType((*SessionUserBindNotify)(nil), "api.SessionUserBindNotify")
-	proto.RegisterType((*SessionDataBiNotify)(nil), "api.SessionDataBiNotify")
+	proto.RegisterType((*SessionOnConnectNotify)(nil), "api.SessionOnConnectNotify")
+	proto.RegisterType((*SessionOnRecvNotify)(nil), "api.SessionOnRecvNotify")
+	proto.RegisterMapType((map[string]string)(nil), "api.SessionOnRecvNotify.HeadersEntry")
+	proto.RegisterType((*SessionOnRecvNotifyResponse)(nil), "api.SessionOnRecvNotifyResponse")
+	proto.RegisterMapType((map[string]string)(nil), "api.SessionOnRecvNotifyResponse.HeadersEntry")
+	proto.RegisterType((*SessionOnCloseNotify)(nil), "api.SessionOnCloseNotify")
+	proto.RegisterType((*SessionSendRequest)(nil), "api.SessionSendRequest")
+	proto.RegisterType((*SessionMultiSendRequest)(nil), "api.SessionMultiSendRequest")
 }
 
-func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
+func init() {
+	proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c)
+}
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 476 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x94, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0x86, 0x71, 0x9c, 0x14, 0x3c, 0x4d, 0xe9, 0x32, 0x4d, 0x5b, 0x83, 0x10, 0x0a, 0x3e, 0x45,
-	0x20, 0xe5, 0x50, 0x0e, 0x54, 0x3d, 0xb6, 0x29, 0xa4, 0x82, 0x54, 0xc8, 0x94, 0x2b, 0xd2, 0xd6,
-	0x9e, 0x10, 0xab, 0xc9, 0xae, 0xf1, 0x6e, 0x90, 0xfc, 0x18, 0xbc, 0x14, 0x4f, 0xc2, 0x83, 0xa0,
-	0x5d, 0xaf, 0x13, 0xd3, 0xf6, 0x10, 0xc4, 0x6d, 0x66, 0x76, 0xf6, 0x9f, 0x6f, 0x66, 0xbc, 0x86,
-	0x80, 0xe7, 0xd9, 0x30, 0x2f, 0xa4, 0x96, 0xe8, 0xf3, 0x3c, 0x8b, 0xbe, 0x02, 0x1b, 0x73, 0x91,
-	0xaa, 0x19, 0xbf, 0xa1, 0x98, 0xbe, 0x2f, 0x49, 0x69, 0xec, 0x41, 0x87, 0xe7, 0xf9, 0xc5, 0x28,
-	0xf4, 0xfa, 0xde, 0x20, 0x88, 0x2b, 0x07, 0x9f, 0x43, 0xc0, 0x93, 0x84, 0x94, 0xfa, 0x40, 0x65,
-	0xd8, 0xb2, 0x27, 0xeb, 0x00, 0x1e, 0xc0, 0x56, 0x22, 0xc5, 0x34, 0xfb, 0x16, 0xfa, 0xf6, 0xc8,
-	0x79, 0xd1, 0x04, 0x0e, 0x27, 0xcb, 0xb9, 0xce, 0x3e, 0x93, 0x52, 0x99, 0x14, 0x23, 0xae, 0x79,
-	0x5d, 0xe6, 0x05, 0x80, 0xaa, 0xa2, 0x17, 0x23, 0x15, 0x7a, 0x7d, 0x7f, 0x10, 0xc4, 0x8d, 0x08,
-	0x22, 0xb4, 0x53, 0xae, 0xb9, 0xad, 0xd5, 0x8d, 0xad, 0x1d, 0xfd, 0xf6, 0xe0, 0x89, 0x93, 0x1a,
-	0x5f, 0x5d, 0x7d, 0xba, 0x94, 0x3a, 0x9b, 0x96, 0x06, 0x6d, 0x75, 0xcf, 0x41, 0xaf, 0x03, 0x06,
-	0x6d, 0x41, 0x7a, 0x26, 0x53, 0x47, 0xed, 0x3c, 0xa3, 0x9f, 0x73, 0x3d, 0x73, 0xc0, 0xd6, 0xc6,
-	0xb7, 0xd0, 0x99, 0xca, 0x62, 0xa1, 0xc2, 0x76, 0xdf, 0x1f, 0x6c, 0x1f, 0xbd, 0x1c, 0x9a, 0x71,
-	0xdd, 0x29, 0x38, 0x7c, 0x67, 0x72, 0xce, 0x85, 0x2e, 0xca, 0xb8, 0xca, 0x37, 0x62, 0xd7, 0x32,
-	0x2d, 0xc3, 0x4e, 0x05, 0x6b, 0xec, 0x67, 0xc7, 0x00, 0xeb, 0x44, 0x64, 0xe0, 0xdf, 0x50, 0xe9,
-	0xf0, 0x8c, 0x69, 0xe6, 0xfc, 0x83, 0xcf, 0x97, 0xe4, 0xb8, 0x2a, 0xe7, 0xa4, 0x75, 0xec, 0x45,
-	0xbf, 0x3c, 0x78, 0x7a, 0xa7, 0x6a, 0x4c, 0x2a, 0x97, 0x42, 0x91, 0xa9, 0x95, 0xc8, 0x94, 0xac,
-	0xd4, 0x4e, 0x6c, 0x6d, 0x3c, 0x87, 0x87, 0x33, 0xe2, 0x29, 0x15, 0x2a, 0x6c, 0x59, 0xf4, 0xd7,
-	0xf7, 0xa3, 0xd7, 0x22, 0xc3, 0x71, 0x95, 0x5d, 0x35, 0x51, 0xdf, 0x5d, 0xb5, 0xe1, 0x37, 0xda,
-	0x38, 0x81, 0x6e, 0x33, 0xf9, 0x9f, 0x1a, 0xf9, 0x08, 0x3d, 0x87, 0x70, 0x26, 0x85, 0xa0, 0x44,
-	0x6f, 0xba, 0x31, 0x99, 0x93, 0x39, 0x72, 0x1b, 0xab, 0xbc, 0xe8, 0x08, 0xb0, 0x56, 0x9b, 0x4b,
-	0x45, 0x9b, 0x68, 0x45, 0x13, 0xd8, 0x77, 0x77, 0xbe, 0x28, 0x2a, 0x4e, 0x33, 0x91, 0xfe, 0x17,
-	0xc2, 0x7b, 0xd8, 0x6b, 0x7c, 0xca, 0xa7, 0xd9, 0x46, 0x62, 0xf7, 0x7c, 0xc9, 0xaf, 0x7e, 0x7a,
-	0xe0, 0x9f, 0x2d, 0x52, 0x7c, 0x04, 0xed, 0x4b, 0x29, 0x88, 0x3d, 0xc0, 0x1d, 0x08, 0x56, 0x4f,
-	0x91, 0x79, 0xd8, 0x03, 0x76, 0xfb, 0xe5, 0xb0, 0x16, 0xee, 0xc2, 0x76, 0x63, 0xa7, 0xac, 0x87,
-	0x08, 0x8f, 0xff, 0x9e, 0x30, 0xdb, 0x47, 0x06, 0xdd, 0xe6, 0x9c, 0xd8, 0x01, 0xee, 0xc1, 0xee,
-	0xad, 0x29, 0xb0, 0xc3, 0x86, 0x96, 0x15, 0x1f, 0x5c, 0x6f, 0xd9, 0x1f, 0xc3, 0x9b, 0x3f, 0x01,
-	0x00, 0x00, 0xff, 0xff, 0xf6, 0x12, 0x68, 0xb1, 0x25, 0x04, 0x00, 0x00,
+	// 449 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x93, 0xc1, 0x6e, 0x13, 0x31,
+	0x10, 0x86, 0xd9, 0x6e, 0x68, 0x95, 0xc9, 0x02, 0x66, 0x92, 0xa6, 0x2b, 0xe0, 0x10, 0xad, 0x84,
+	0xb4, 0x42, 0x22, 0x07, 0xb8, 0xa0, 0x5c, 0x10, 0x6c, 0x11, 0xad, 0x10, 0x45, 0x72, 0xef, 0x48,
+	0xee, 0x7a, 0x4a, 0x57, 0x49, 0xec, 0x25, 0x76, 0x2a, 0xed, 0x3b, 0xf1, 0x24, 0x1c, 0x78, 0x26,
+	0x64, 0xc7, 0xc9, 0xa6, 0x90, 0x88, 0x0b, 0xb7, 0x19, 0xcf, 0xf8, 0x1b, 0xff, 0xbf, 0x6d, 0xe8,
+	0x8a, 0xba, 0x1a, 0xd7, 0x0b, 0x6d, 0x35, 0xc6, 0xa2, 0xae, 0xb2, 0xaf, 0xc0, 0xce, 0x84, 0x92,
+	0xe6, 0x46, 0x4c, 0x89, 0xd3, 0xf7, 0x25, 0x19, 0x8b, 0x03, 0xb8, 0x2f, 0xea, 0xfa, 0xfc, 0x34,
+	0x8d, 0x46, 0x51, 0xde, 0xe5, 0xab, 0x04, 0x9f, 0x41, 0x57, 0x94, 0x25, 0x19, 0xf3, 0x89, 0x9a,
+	0xf4, 0xc0, 0x57, 0xda, 0x05, 0x1c, 0xc2, 0x61, 0xa9, 0xd5, 0x75, 0xf5, 0x2d, 0x8d, 0x7d, 0x29,
+	0x64, 0xd9, 0x7b, 0x18, 0x5e, 0x92, 0x31, 0x95, 0x56, 0x5f, 0x54, 0xa1, 0x95, 0xa2, 0xd2, 0x5e,
+	0x68, 0x5b, 0x5d, 0x37, 0xc8, 0x20, 0x36, 0x95, 0x0c, 0x33, 0x5c, 0xe8, 0x18, 0xba, 0x26, 0x75,
+	0x7e, 0x1a, 0xf0, 0x21, 0xcb, 0x7e, 0x46, 0xd0, 0xdf, 0x40, 0x38, 0x95, 0xb7, 0x7b, 0x09, 0x0c,
+	0x9c, 0xa8, 0xb0, 0xdd, 0x85, 0xf8, 0x16, 0x8e, 0x6e, 0x48, 0x48, 0x5a, 0x98, 0x34, 0x1e, 0xc5,
+	0x79, 0xef, 0xd5, 0xf3, 0xb1, 0x73, 0x60, 0x07, 0x6e, 0x7c, 0xb6, 0xea, 0xfb, 0xa0, 0xec, 0xa2,
+	0xe1, 0xeb, 0x5d, 0x88, 0xd0, 0xb9, 0xd2, 0xb2, 0x49, 0x3b, 0xa3, 0x28, 0x4f, 0xb8, 0x8f, 0x9f,
+	0x4c, 0x20, 0xd9, 0x6e, 0x76, 0x63, 0xa7, 0xd4, 0xac, 0x0f, 0x32, 0xa5, 0xc6, 0x59, 0x78, 0x2b,
+	0x66, 0x4b, 0x0a, 0x47, 0x59, 0x25, 0x93, 0x83, 0x37, 0x51, 0xf6, 0x2b, 0x82, 0xa7, 0x3b, 0xa6,
+	0x73, 0x32, 0xb5, 0x56, 0x86, 0x9c, 0x09, 0xc6, 0x0a, 0xbb, 0x34, 0x1e, 0xf7, 0x80, 0x87, 0x0c,
+	0x3f, 0xb6, 0x42, 0x0e, 0xbc, 0x90, 0x97, 0xfb, 0x84, 0xac, 0x51, 0xff, 0x10, 0x14, 0xff, 0x27,
+	0x41, 0x39, 0x0c, 0xda, 0x1b, 0x9e, 0x69, 0x43, 0xfb, 0x6e, 0x27, 0x9b, 0x00, 0x86, 0xce, 0x4b,
+	0x52, 0x72, 0xfd, 0xda, 0xfe, 0xbe, 0x45, 0x84, 0x8e, 0x14, 0x56, 0xf8, 0x51, 0x09, 0xf7, 0x71,
+	0xf6, 0x0e, 0x4e, 0xc2, 0xde, 0xcf, 0xcb, 0x99, 0xad, 0xb6, 0x01, 0x08, 0x1d, 0x53, 0x49, 0xe7,
+	0x57, 0x9c, 0x77, 0xb9, 0x8f, 0x77, 0x21, 0x5e, 0xfc, 0x88, 0x20, 0x2e, 0xe6, 0x12, 0x7b, 0x70,
+	0x54, 0xcc, 0xe5, 0x85, 0x56, 0xc4, 0xee, 0x21, 0x83, 0xa4, 0x98, 0xcb, 0xcd, 0x17, 0x60, 0x11,
+	0x9e, 0x40, 0xbf, 0x98, 0xcb, 0x3f, 0x1f, 0x2d, 0x03, 0x1c, 0x00, 0xdb, 0x2e, 0x38, 0xc3, 0x59,
+	0x0f, 0x8f, 0xe1, 0xf1, 0x9d, 0x76, 0xe7, 0x00, 0x4b, 0x10, 0xe1, 0x61, 0xbb, 0xec, 0x4e, 0xcb,
+	0x06, 0x77, 0xc9, 0x1b, 0x19, 0xec, 0x18, 0xfb, 0xf0, 0xa8, 0x2d, 0xac, 0x08, 0xc3, 0xab, 0x43,
+	0xff, 0x4b, 0x5f, 0xff, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xeb, 0x4f, 0x23, 0xbf, 0xb2, 0x03, 0x00,
+	0x00,
 }

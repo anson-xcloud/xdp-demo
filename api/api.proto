@@ -2,63 +2,51 @@ syntax = "proto3";
 
 package api;
 
-enum Cmd{
-	None =0;
+enum Cmd {
+  CmdNone = 0;
+  CmdHandshake = 1;
 
-	// local -> xcloud
-	Handshake = 1;
-	MultiSessionData      = 2;
+  CmdSessionOnConnect = 10;
+  CmdSessionOnRecv = 11;
+  CmdSessionOnClose = 12;
 
-	// xcloud -> local
-	SessionHTTP      = 20;
-	SessionConnect = 21;
-	SessionClose   = 22;
-	SessionUserBind   = 23;
-	
-	// xcloud <-> local
-	SessionData      = 40;
+  CmdSessionSend = 20;
+  CmdSessionMultiSend = 21;
+  CmdSessionClose = 22;
 }
- 
+
 message HandshakeRequest {
-	string	appID     =1;
-	string accessKey =2;
-	string config=3;
+  string appID = 1;
+  string accessKey = 2;
+  string config = 3;
 }
 
-message MultiSessionDataRequest{
-	repeated string	sessionIDs =1;  
-	bytes data      =2;
-	}
-  
-message SessionHTTPNotify{
-string	sessionID =1; 
-string method  =2;
-string	path =3; 
-	map<string,string> forms      =4;
-	bytes body = 5;
+message SessionOnConnectNotify {
+  string sid = 1;
+  string openID = 2;
 }
 
-message SessionHTTPNotifyResponse{
-uint32	code =1;  
-	map<string,string> headers      =2;
-	bytes body = 3;
+message SessionOnRecvNotify {
+  string sid = 1;
+  string api = 2;
+  map<string, string> headers = 3;
+  bytes body = 4;
 }
 
-message SessionConnectNotify{
-string	sessionID =1; 
-	string openID      =2;
+message SessionOnRecvNotifyResponse {
+  uint32 status = 1;
+  map<string, string> headers = 2;
+  bytes body = 3;
 }
 
-message SessionCloseNotify{
-string	sessionID =1;  
+message SessionOnCloseNotify { string sid = 1; }
+
+message SessionSendRequest {
+  string sid = 1;
+  bytes data = 2;
 }
 
-message SessionUserBindNotify{
-string	sessionID =1;  
-string openID      =2;
-}
-
-message SessionDataBiNotify{
-string	sessionID =1;  
-bytes data      =2;
+message SessionMultiSendRequest {
+  repeated string sids = 1;
+  bytes data = 2;
 }

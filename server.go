@@ -82,7 +82,7 @@ func (s *Server) Serve(addr string) error {
 	s.conn = conn
 
 	go func() {
-		if err = s.call(api.Cmd_Handshake, &api.HandshakeRequest{
+		if err = s.call(api.Cmd_CmdHandshake, &api.HandshakeRequest{
 			AppID:     s.addr.AppID,
 			AccessKey: ap.AccessKey,
 		}); err != nil {
@@ -95,30 +95,28 @@ func (s *Server) Serve(addr string) error {
 
 // Send send data to session client
 func (s *Server) Send(sess *Session, data []byte) error {
-	var sd api.SessionDataBiNotify
-	sd.SessionID = sess.SessionID
-	sd.Data = data
-	return s.push(api.Cmd_SessionData, &sd)
+	var req api.SessionSendRequest
+	req.Sid = sess.SessionID
+	req.Data = data
+	return s.push(api.Cmd_CmdSessionSend, &req)
 }
 
 // MultiSend multi send data to session at once
 func (s *Server) MultiSend(sids []string, data []byte) error {
-	var sd api.MultiSessionDataRequest
-	sd.SessionIDs = sids
-	sd.Data = data
-	return s.push(api.Cmd_MultiSessionData, &sd)
+	var req api.SessionMultiSendRequest
+	req.Sids = sids
+	req.Data = data
+	return s.push(api.Cmd_CmdSessionMultiSend, &req)
 }
 
 func (s *Server) process(p *Packet) {
 	switch p.Cmd {
-	case uint32(api.Cmd_SessionConnect):
-		s.handleData(p)
-	case uint32(api.Cmd_SessionClose):
-		s.handleData(p)
-	case uint32(api.Cmd_SessionData):
-		s.handleData(p)
-	case uint32(api.Cmd_SessionHTTP):
-		s.handleHTTP(p)
+	case uint32(api.Cmd_CmdSessionOnConnect):
+		s.processSessionConnect(p)
+	case uint32(api.Cmd_CmdSessionOnRecv):
+		s.processSessionRecv(p)
+	case uint32(api.Cmd_CmdSessionOnClose):
+		s.processSessionClose(p)
 	}
 }
 
@@ -191,65 +189,54 @@ func (s *Server) push(cmd api.Cmd, sa proto.Message) error {
 	return s.conn.write(&p)
 }
 
-func (s *Server) handleData(p *Packet) {
-	var dt api.SessionDataBiNotify
-	if err := proto.Unmarshal(p.Data, &dt); err != nil {
-		s.opts.Logger.Debug("unmarshal handleData error:%s", err)
-		return
-	}
-
-	var req Request
-	req.Session = s.sessMgr.Get(dt.SessionID)
-	req.Data = dt.Data
-	s.opts.Handler.Serve(&req)
-}
-
-func (s *Server) handleSessionConnect(p *Packet) {
-	var dt api.SessionConnectNotify
-	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+func (s *Server) processSessionConnect(p *Packet) {
+	var notify api.SessionOnConnectNotify
+	if err := proto.Unmarshal(p.Data, &notify); err != nil {
 		s.opts.Logger.Debug("unmarshal handleSessionConnect error:%s", err)
 		return
 	}
 
 	var sess Session
-	sess.SessionID = dt.SessionID
+	sess.SessionID = notify.Sid
 	// sess.Addr=dt.a
 	sess.sv = s
 	s.sessMgr.Add(&sess)
 	s.opts.Handler.ServeConnect(&sess)
 }
 
-func (s *Server) handleSessionClose(p *Packet) {
-	var dt api.SessionCloseNotify
-	if err := proto.Unmarshal(p.Data, &dt); err != nil {
+func (s *Server) processSessionClose(p *Packet) {
+	var notify api.SessionOnCloseNotify
+	if err := proto.Unmarshal(p.Data, &notify); err != nil {
 		s.opts.Logger.Debug("unmarshal SessionCloseNotify error:%s", err)
 		return
 	}
 
-	sess := s.sessMgr.Get(dt.SessionID)
+	sess := s.sessMgr.Get(notify.Sid)
 	s.sessMgr.Del(sess)
 	s.opts.Handler.ServeClose(sess)
 }
 
-func (s *Server) handleHTTP(p *Packet) {
-	var dt api.SessionHTTPNotify
-	if err := proto.Unmarshal(p.Data, &dt); err != nil {
-		s.opts.Logger.Debug("unmarshal SessionHTTPNotify error:%s", err)
+func (s *Server) processSessionRecv(p *Packet) {
+	var notify api.SessionOnRecvNotify
+	if err := proto.Unmarshal(p.Data, &notify); err != nil {
+		s.opts.Logger.Debug("unmarshal handleData error:%s", err)
 		return
 	}
 
-	var req HTTPRequest
-	req.Session = s.sessMgr.Get(dt.SessionID)
-	req.Method = dt.Method
-	req.Path = dt.Path
-	req.Forms = dt.Forms
-	req.Data = dt.Body
+	var req Request
+	req.Session = s.sessMgr.Get(notify.Sid)
+	req.Api = notify.Api
+	req.Headers = notify.Headers
+	req.Body = notify.Body
 	req.reqTime = time.Now()
 
-	res := &httpResponseWriter{}
+	res := &responseWriter{}
 	res.p = p
 	res.sv = s
 	res.writed = 0
 	res.req = &req
-	s.opts.HTTPHandler.ServeHTTP(res, &req)
+
+	// TODO
+	// 提供接管函数  res没有被接管 则在函数返回后默认返回ok
+	s.opts.Handler.Serve(res, &req)
 }

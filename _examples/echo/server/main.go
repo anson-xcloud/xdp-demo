@@ -8,8 +8,7 @@ import (
 )
 
 func main() {
-	xdp.HTTPHandleFunc("/", httpEcho)
-	xdp.HandleFunc("", tcpEcho)
+	xdp.HandleFunc("/", echo)
 
 	svr := xdp.NewServer()
 	if err := svr.Serve("1:test"); err != nil {
@@ -17,20 +16,13 @@ func main() {
 	}
 }
 
-func httpEcho(res xdp.HTTPResponseWriter, req *xdp.HTTPRequest) {
+func echo(res xdp.ResponseWriter, req *xdp.Request) {
 	echo := fmt.Sprintf("%s : %s %v",
 		time.Now().Format(time.RFC3339),
-		req.Path,
-		req.Forms,
+		req.Api,
+		req.Headers,
 	)
 
+	fmt.Println("recv %s %s", req.Session.SessionID, string(req.Body))
 	res.Write([]byte(echo))
-}
-
-func tcpEcho(req *xdp.Request) {
-	fmt.Println("recv %s %s", req.Session.SessionID, string(req.Data))
-	// if _, err := con.Write(data); err != nil {
-	// 	fmt.Println("write ", err)
-	// 	return
-	// }
 }
