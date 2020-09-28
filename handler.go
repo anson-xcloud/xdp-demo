@@ -157,7 +157,7 @@ func (s *ServeMux) Serve(res ResponseWriter, req *Request) {
 		h.Serve(res, req)
 	} else {
 		// TODO error log
-		// res.WriteStatus(http.StatusNotFound)
+		res.WriteStatus(http.StatusNotFound)
 	}
 }
 

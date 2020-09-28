@@ -23,6 +23,10 @@ func echo(res xdp.ResponseWriter, req *xdp.Request) {
 		req.Headers,
 	)
 
-	fmt.Println("recv %s %s", req.Session.SessionID, string(req.Body))
+	var sid = "TODO: nil session"
+	if req.Session != nil {
+		sid = req.Session.SessionID
+	}
+	fmt.Println("recv %s %s", sid, string(req.Body))
 	res.Write([]byte(echo))
 }
