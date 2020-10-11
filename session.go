@@ -1,14 +1,23 @@
 package xdp
 
-import "sync"
+import (
+	"net"
+	"sync"
+)
 
 // Session use session
 type Session struct {
-	Addr      string
-	OpenID    string
+	Addr net.Addr
+
+	OpenID string
+
 	SessionID string
 
 	sv *Server
+}
+
+func newSession(sv *Server) *Session {
+	return &Session{sv: sv}
 }
 
 // Send do send session data
@@ -48,4 +57,15 @@ func (sm *sessionManager) Del(sess *Session) {
 	defer sm.Unlock()
 
 	delete(sm.sesses, sess.SessionID)
+}
+
+func (sm *sessionManager) Pop(sid string) *Session {
+	sm.Lock()
+	defer sm.Unlock()
+
+	sess, ok := sm.sesses[sid]
+	if ok {
+		delete(sm.sesses, sid)
+	}
+	return sess
 }

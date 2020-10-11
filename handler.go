@@ -12,11 +12,15 @@ import (
 
 // Handler tcp/udp raw data handler
 type Handler interface {
-	ServeConnect(*Session)
+	ServeXDP(ResponseWriter, *Request)
+}
 
-	Serve(ResponseWriter, *Request)
+type StreamHandler interface {
+	Handler
 
-	ServeClose(*Session)
+	ServeXDPConnect(*Session)
+
+	ServeXDPClose(*Session)
 }
 
 type handlerServeFunc func(ResponseWriter, *Request)
@@ -28,12 +32,12 @@ func (f handlerServeFunc) Serve(res ResponseWriter, req *Request) {
 // Request request data info
 type Request struct {
 	Session *Session
-
 	Api     string
 	Headers map[string]string
 	Body    []byte
 
 	reqTime time.Time
+	packet  *Packet
 }
 
 // ResponseWriter response write
@@ -44,8 +48,6 @@ type ResponseWriter interface {
 }
 
 type responseWriter struct {
-	p *Packet
-
 	sv *Server
 
 	resp api.SessionOnRecvNotifyResponse
@@ -85,11 +87,14 @@ func (r *responseWriter) write() error {
 		return err
 	}
 
-	if r.p.ID != 0 {
-		r.p.Flag |= flagRPCResponse
+	var p Packet
+	p.ID = r.req.packet.ID
+	p.Cmd = r.req.packet.Cmd
+	if p.ID != 0 {
+		p.Flag |= flagRPCResponse
 	}
-	r.p.Data = data
-	return r.sv.conn.write(r.p)
+	p.Data = data
+	return r.sv.conn.write(&p)
 }
 
 // ServeMux support multi handler based on path
@@ -141,7 +146,7 @@ func (s *ServeMux) getHandler(req *Request) handlerServeFunc {
 }
 
 // ServeConnect implement Handler.ServeConnect
-func (s *ServeMux) ServeConnect(sess *Session) {
+func (s *ServeMux) ServeXDPConnect(sess *Session) {
 	s.mtx.RLock()
 	fn := s.onConnect
 	s.mtx.RUnlock()
@@ -152,17 +157,19 @@ func (s *ServeMux) ServeConnect(sess *Session) {
 }
 
 // Serve implement Handler.Serve
-func (s *ServeMux) Serve(res ResponseWriter, req *Request) {
+func (s *ServeMux) ServeXDP(res ResponseWriter, req *Request) {
 	if h := s.getHandler(req); h != nil {
 		h.Serve(res, req)
-	} else {
-		// TODO error log
+		return
+	}
+
+	if req.packet.ID != 0 {
 		res.WriteStatus(http.StatusNotFound)
 	}
 }
 
 // ServeClose implement Handler.ServeClose
-func (s *ServeMux) ServeClose(sess *Session) {
+func (s *ServeMux) ServeXDPClose(sess *Session) {
 	s.mtx.RLock()
 	fn := s.onClose
 	s.mtx.RUnlock()

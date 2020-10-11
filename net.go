@@ -133,18 +133,19 @@ func (c *Connection) recv(handler func(p *Packet)) error {
 			return err
 		}
 
-		if p.Flag&flagRPCResponse != 0 {
-			c.mtx.Lock()
-			if ctx, ok := c.callers[p.ID]; !ok {
-				c.mtx.Unlock()
-				c.Error("%s unexisted rpc return %d", nc.RemoteAddr(), p.ID)
-			} else {
-				delete(c.callers, p.ID)
-				c.mtx.Unlock()
-				ctx.ch <- &p
-			}
+		if p.Flag&flagRPCResponse == 0 {
+			handler(&p)
+			continue
+		}
+
+		c.mtx.Lock()
+		if ctx, ok := c.callers[p.ID]; !ok {
+			c.mtx.Unlock()
+			c.Error("%s unexisted rpc return %d", nc.RemoteAddr(), p.ID)
 		} else {
-			go handler(&p)
+			delete(c.callers, p.ID)
+			c.mtx.Unlock()
+			ctx.ch <- &p
 		}
 	}
 }
@@ -172,7 +173,8 @@ func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 		return nil, err
 	}
 
-	tctx, _ := context.WithTimeout(ctx, time.Second*30)
+	tctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
 	select {
 	case p, ok := <-caller.ch:
 		if !ok {

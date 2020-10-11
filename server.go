@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -110,14 +111,16 @@ func (s *Server) MultiSend(sids []string, data []byte) error {
 }
 
 func (s *Server) process(p *Packet) {
-	switch p.Cmd {
-	case uint32(api.Cmd_CmdSessionOnConnect):
-		s.processSessionConnect(p)
-	case uint32(api.Cmd_CmdSessionOnRecv):
-		s.processSessionRecv(p)
-	case uint32(api.Cmd_CmdSessionOnClose):
-		s.processSessionClose(p)
-	}
+	go func() {
+		switch p.Cmd {
+		case uint32(api.Cmd_CmdSessionOnConnect):
+			s.processSessionConnect(p)
+		case uint32(api.Cmd_CmdSessionOnRecv):
+			s.processSessionRecv(p)
+		case uint32(api.Cmd_CmdSessionOnClose):
+			s.processSessionClose(p)
+		}
+	}()
 }
 
 func (s *Server) signURL(vals url.Values) {
@@ -192,16 +195,23 @@ func (s *Server) push(cmd api.Cmd, sa proto.Message) error {
 func (s *Server) processSessionConnect(p *Packet) {
 	var notify api.SessionOnConnectNotify
 	if err := proto.Unmarshal(p.Data, &notify); err != nil {
-		s.opts.Logger.Debug("unmarshal handleSessionConnect error:%s", err)
+		s.Logger().Debug("unmarshal handleSessionConnect error:%s", err)
 		return
 	}
 
-	var sess Session
+	addr, err := net.ResolveTCPAddr(notify.Network, notify.Addr)
+	if err != nil {
+		s.Logger().Error("ResolveTCPAddr session %s:%s addr error: %s", notify.Network, notify.Addr, err)
+	}
+
+	sess := newSession(s)
 	sess.SessionID = notify.Sid
-	// sess.Addr=dt.a
-	sess.sv = s
-	s.sessMgr.Add(&sess)
-	s.opts.Handler.ServeConnect(&sess)
+	sess.OpenID = notify.OpenID
+	sess.Addr = addr
+	s.sessMgr.Add(sess)
+	if sh, ok := s.opts.Handler.(StreamHandler); ok {
+		sh.ServeXDPConnect(sess)
+	}
 }
 
 func (s *Server) processSessionClose(p *Packet) {
@@ -211,9 +221,12 @@ func (s *Server) processSessionClose(p *Packet) {
 		return
 	}
 
-	sess := s.sessMgr.Get(notify.Sid)
-	s.sessMgr.Del(sess)
-	s.opts.Handler.ServeClose(sess)
+	sess := s.sessMgr.Pop(notify.Sid)
+	if sess != nil {
+		if sh, ok := s.opts.Handler.(StreamHandler); ok {
+			sh.ServeXDPClose(sess)
+		}
+	}
 }
 
 func (s *Server) processSessionRecv(p *Packet) {
@@ -229,14 +242,12 @@ func (s *Server) processSessionRecv(p *Packet) {
 	req.Headers = notify.Headers
 	req.Body = notify.Body
 	req.reqTime = time.Now()
+	req.packet = p
 
 	res := &responseWriter{}
-	res.p = p
 	res.sv = s
 	res.writed = 0
 	res.req = &req
 
-	// TODO
-	// 提供接管函数  res没有被接管 则在函数返回后默认返回ok
-	s.opts.Handler.Serve(res, &req)
+	s.opts.Handler.ServeXDP(res, &req)
 }

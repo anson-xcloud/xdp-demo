@@ -24,6 +24,8 @@ message HandshakeRequest {
 message SessionOnConnectNotify {
   string sid = 1;
   string openID = 2;
+  string network = 3;
+  string addr = 4;
 }
 
 message SessionOnRecvNotify {
