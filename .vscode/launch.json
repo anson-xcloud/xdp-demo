@@ -22,6 +22,16 @@
             "cwd": "${workspaceRoot}/_examples/echo/server",
             "env": {},
             "args": []
+        },
+        {
+            "name": "LaunchEchoClient",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/_examples/echo/client/main.go",
+            "cwd": "${workspaceRoot}/_examples/echo/client",
+            "env": {},
+            "args": []
         }
     ]
 }

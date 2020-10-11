@@ -15,7 +15,8 @@ type Client struct {
 
 	conn *Connection
 
-	token string
+	token  string
+	cookie *http.Cookie
 }
 
 func NewClient(appid string) *Client {
@@ -67,8 +68,16 @@ func (c *Client) Login(user, pwd string) error {
 	vals := make(url.Values)
 	vals.Add("user", user)
 	vals.Add("pwd", pwd)
-	addr := fmt.Sprintf("%s%s%s?%s", XCloudAddr, APIUserLogin, c.AppID, vals.Encode())
-	resp, err := http.Get(addr)
+	addr := fmt.Sprintf("%s%s?%s", XCloudAddr, APIUserLogin, vals.Encode())
+
+	req, err := http.NewRequest(http.MethodGet, addr, nil)
+	if err != nil {
+		return err
+	}
+	if c.cookie != nil {
+		req.AddCookie(c.cookie)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -79,6 +88,11 @@ func (c *Client) Login(user, pwd string) error {
 		return err
 	}
 
+	cookies := resp.Cookies()
+	if len(cookies) > 0 {
+		fmt.Println("cookies:::", cookies)
+		c.cookie = cookies[0]
+	}
 	c.token = string(data)
 	return nil
 }
