@@ -50,7 +50,15 @@ func (c *Client) Send(api string, data []byte) {
 func (c *Client) Get(api string, headers url.Values) ([]byte, error) {
 	he := headers.Encode()
 	addr := fmt.Sprintf("%s%s%s?%s", XCloudAddr, APIClientXdpPrefix, c.AppID, he)
-	resp, err := http.Get(addr)
+	req, err := http.NewRequest(http.MethodGet, addr, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.cookie != nil {
+		req.AddCookie(c.cookie)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

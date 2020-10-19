@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"time"
 
@@ -17,9 +18,8 @@ func main() {
 
 	time.Sleep(time.Second)
 
-	cli.Login("user", "pwd")
-	// for range time.NewTicker(time.Second).C {
-	// 	data, err := xdp.Get(appid, "", headers)
-	// 	fmt.Println("echo: \n", string(data), err)
-	// }
+	for range time.NewTicker(time.Second).C {
+		data, err := cli.Get("", headers)
+		fmt.Println("echo: \n", string(data), err)
+	}
 }
