@@ -8,6 +8,16 @@ import (
 	"sync"
 )
 
+type IClient interface {
+	Connect() error
+
+	Send(api string, data []byte)
+
+	Get(api string, headers url.Values) ([]byte, error)
+
+	Login(user, pwd string) error
+}
+
 type Client struct {
 	mtx sync.Mutex
 
