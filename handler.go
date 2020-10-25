@@ -1,6 +1,7 @@
 package xdp
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -44,7 +45,7 @@ type Request struct {
 type ResponseWriter interface {
 	WriteStatus(statusCode int)
 
-	Write(data []byte)
+	Write(data interface{}) error
 }
 
 type responseWriter struct {
@@ -57,13 +58,23 @@ type responseWriter struct {
 	req *Request
 }
 
-func (r *responseWriter) Write(data []byte) {
+func (r *responseWriter) Write(data interface{}) error {
 	if r.resp.Status == 0 {
 		r.resp.Status = uint32(http.StatusOK)
 	}
-	r.resp.Body = data
 
-	r.write()
+	switch rd := data.(type) {
+	case []byte:
+		r.resp.Body = rd
+	default:
+		bd, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		r.resp.Body = bd
+	}
+
+	return r.write()
 }
 
 func (r *responseWriter) WriteStatus(statusCode int) {
