@@ -3,8 +3,7 @@ syntax = "proto3";
 package api;
 
 enum Cmd {
-  CmdNone = 0;
-  CmdHandshake = 1;
+  CmdNone = 0; CmdHandshake = 1;
 
   CmdSessionOnConnect = 10;
   CmdSessionOnRecv = 11;
@@ -21,6 +20,8 @@ message HandshakeRequest {
   string config = 3;
 }
 
+enum Source { Anonymous = 0; User = 1; AppUser = 2; AppServer = 3; }
+
 message SessionOnConnectNotify {
   string sid = 1;
   string openID = 2;
@@ -30,9 +31,11 @@ message SessionOnConnectNotify {
 
 message SessionOnRecvNotify {
   string sid = 1;
-  string api = 2;
-  map<string, string> headers = 3;
-  bytes body = 4;
+  string openid = 2;
+  Source source = 3;
+  string api = 4;
+  map<string, string> headers = 5;
+  bytes body = 6;
 }
 
 message SessionOnRecvNotifyResponse {

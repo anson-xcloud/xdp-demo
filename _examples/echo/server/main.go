@@ -27,6 +27,6 @@ func echo(res xdp.ResponseWriter, req *xdp.Request) {
 	if req.Session != nil {
 		sid = req.Session.SessionID
 	}
-	fmt.Println("recv %s %s", sid, string(req.Body))
+	fmt.Printf("recv %s %d(%s) %v\n", sid, len(req.Body), string(req.Body), req.Headers)
 	res.Write([]byte(echo))
 }

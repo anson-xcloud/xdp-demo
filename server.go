@@ -236,8 +236,16 @@ func (s *Server) processSessionRecv(p *Packet) {
 		return
 	}
 
+	sess := s.sessMgr.Get(notify.Sid)
+	if sess == nil && notify.Sid != "" {
+		sess = newSession(s)
+		sess.SessionID = notify.Sid
+		sess.OpenID = notify.Openid
+		s.sessMgr.Add(sess)
+	}
+
 	var req Request
-	req.Session = s.sessMgr.Get(notify.Sid)
+	req.Session = sess
 	req.Api = notify.Api
 	req.Headers = notify.Headers
 	req.Body = notify.Body
