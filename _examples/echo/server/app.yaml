@@ -8,4 +8,7 @@ tcp:
 http:
   - "/get"
   - "/set" 
+
+events:
+  - "/on"
   

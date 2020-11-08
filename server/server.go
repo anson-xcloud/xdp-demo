@@ -154,7 +154,7 @@ func (x *xdpServer) Serve(addr string) error {
 	}
 
 	go func() {
-		if _, err = x.call(apipb.Cmd_CmdHandshake, &apipb.HandshakeRequest{
+		if _, err = call(conn, apipb.Cmd_CmdHandshake, &apipb.HandshakeRequest{
 			AppID:     x.addr.AppID,
 			AccessKey: ap.AccessKey,
 		}); err != nil {
@@ -297,6 +297,10 @@ func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 }
 
 func (x *xdpServer) call(cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
+	return call(x.conn, cmd, pm)
+}
+
+func call(conn *Connection, cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return nil, err
@@ -305,7 +309,7 @@ func (x *xdpServer) call(cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
 	var p Packet
 	p.Cmd = uint32(cmd)
 	p.Data = bs
-	rp, err := x.conn.Call(context.Background(), &p)
+	rp, err := conn.Call(context.Background(), &p)
 	if err != nil {
 		return nil, err
 	}

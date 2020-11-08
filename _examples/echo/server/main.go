@@ -6,7 +6,7 @@ import (
 
 func main() {
 	eg := new(errgroup.Group)
-	eg.Go(app)
-	eg.Go(plugin)
+	eg.Go(hostApp)
+	eg.Go(pluginApp)
 	eg.Wait()
 }
