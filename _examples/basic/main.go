@@ -1,19 +1,18 @@
 package main
 
 import (
-	"github.com/anson-xcloud/xdp-demo"
+	"github.com/anson-xcloud/xdp-demo/server"
 )
 
-func hello(res xdp.ResponseWriter, req *xdp.Request) {
-	res.Write([]byte("hello"))
+func hello(svr server.Server, req *server.Request) {
+	svr.Reply(req, []byte("hello"))
 }
 
 func main() {
-	xdp.HandleFunc("", hello)
+	server.HandleFunc("", hello)
 
-	svr := xdp.NewServer()
-	if err := svr.Serve("1:test"); err != nil {
-		svr.Logger().Error("%s", err)
+	if err := server.Serve("appid:appkey"); err != nil {
+		server.Error("%s", err)
 		return
 	}
 }

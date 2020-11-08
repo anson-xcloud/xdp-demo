@@ -18,8 +18,8 @@ func main() {
 
 	time.Sleep(time.Second)
 
-	for range time.NewTicker(time.Second).C {
+	for range time.NewTicker(time.Second * 3).C {
 		data, err := cli.Get("", headers)
-		fmt.Println("echo: \n", string(data), err)
+		fmt.Println("echo: ", string(data), err)
 	}
 }

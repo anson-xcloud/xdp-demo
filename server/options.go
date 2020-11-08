@@ -1,4 +1,4 @@
-package xdp
+package server
 
 import (
 	"io/ioutil"
@@ -10,7 +10,7 @@ type Option func(*Options)
 
 // Options server all options
 type Options struct {
-	Handler Handler
+	Handler2 Handler
 
 	Logger Logger
 
@@ -19,15 +19,15 @@ type Options struct {
 }
 
 var defaultOptions = Options{
-	Handler: defaultServeMux,
-	Logger:  new(fmtLogger),
+	Handler2: defaultServeMux,
+	Logger:   defaultLogger,
 }
 
 // WithHandler set handler
 // if dont set, default use *ServeMux
 func WithHandler(h Handler) Option {
 	return func(opts *Options) {
-		opts.Handler = h
+		opts.Handler2 = h
 	}
 }
 

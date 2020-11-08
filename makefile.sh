@@ -1,7 +1,8 @@
 #!/bin/bash
 
 make_build() {
-    go build .
+    go build ./client
+    go build ./server
     go build -o build/_examples/basic ./_examples/basic
     go build -o build/_examples/echo_server ./_examples/echo/server
 }

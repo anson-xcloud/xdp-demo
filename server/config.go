@@ -1,4 +1,4 @@
-package xdp
+package server
 
 const (
 	// XCloudAddr xcloud server addr

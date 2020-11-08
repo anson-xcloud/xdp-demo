@@ -1,4 +1,4 @@
-package xdp
+package server
 
 import (
 	"context"

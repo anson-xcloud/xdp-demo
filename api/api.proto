@@ -1,57 +1,48 @@
 syntax = "proto3";
 
-package api;
+package apipb;
+
+option go_package = "github.com/anson-xcloud/xdp-demo/api";
 
 enum Cmd {
-  CmdNone = 0; CmdHandshake = 1;
+  CmdNone = 0;
 
-  CmdSessionOnConnect = 10;
-  CmdSessionOnRecv = 11;
-  CmdSessionOnClose = 12;
+  CmdHandshake = 1;
 
-  CmdSessionSend = 20;
-  CmdSessionMultiSend = 21;
-  CmdSessionClose = 22;
+  CmdRecv = 11;
+  CmdSend = 20;
+  CmdMultiSend = 21;
+  CmdGet = 22;
+}
+
+message Source {
+  string sid = 1;
+  string appid = 2;
+
+  // below invalid for user session
+  string openid = 3;
+  string network = 4;
+  string addr = 5;
+}
+
+message Data {
+  string api = 1;
+  map<string, string> headers = 2;
+  bytes data = 3;
+}
+
+message Message {
+  Source source = 1;
+  Data data = 2;
+}
+
+message MultiMessage {
+  repeated Source sources = 1;
+  Data data = 2;
 }
 
 message HandshakeRequest {
   string appID = 1;
   string accessKey = 2;
   string config = 3;
-}
-
-enum Source { Anonymous = 0; User = 1; AppUser = 2; AppServer = 3; }
-
-message SessionOnConnectNotify {
-  string sid = 1;
-  string openID = 2;
-  string network = 3;
-  string addr = 4;
-}
-
-message SessionOnRecvNotify {
-  string sid = 1;
-  string openid = 2;
-  Source source = 3;
-  string api = 4;
-  map<string, string> headers = 5;
-  bytes body = 6;
-}
-
-message SessionOnRecvNotifyResponse {
-  uint32 status = 1;
-  map<string, string> headers = 2;
-  bytes body = 3;
-}
-
-message SessionOnCloseNotify { string sid = 1; }
-
-message SessionSendRequest {
-  string sid = 1;
-  bytes data = 2;
-}
-
-message SessionMultiSendRequest {
-  repeated string sids = 1;
-  bytes data = 2;
 }
