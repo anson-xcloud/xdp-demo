@@ -65,6 +65,8 @@ type Request struct {
 type Server interface {
 	GetLogger() Logger
 
+	GetAddr() *Address
+
 	// Serve block run server until error or shutdown
 	Serve(addr string) error
 
@@ -132,6 +134,11 @@ func NewServer(opt ...Option) Server {
 // Logger implement server.GetLogger
 func (x *xdpServer) GetLogger() Logger {
 	return x.opts.Logger
+}
+
+// GetAddr implement server.GetAddr
+func (x *xdpServer) GetAddr() *Address {
+	return x.addr
 }
 
 // Serve start serve at addr

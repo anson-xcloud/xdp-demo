@@ -7,12 +7,14 @@ import (
 	"github.com/anson-xcloud/xdp-demo/server"
 )
 
-func hostApp() error {
+const appidOne = "app1"
+
+func appOne() error {
 	sm := server.NewServeMux()
-	sm.HandleFunc("/", echo)
+	sm.HandleFunc(server.HandlerSourceAllUser, "", echo)
 
 	svr := server.NewServer(server.WithHandler(sm))
-	return svr.Serve("app1:key1")
+	return svr.Serve(appidOne + ":key1")
 }
 
 func echo(svr server.Server, req *server.Request) {
@@ -24,5 +26,13 @@ func echo(svr server.Server, req *server.Request) {
 
 	fmt.Printf("recv %s %s %v\n", req.Sid, string(req.Data.Data), req.Headers)
 	svr.Reply(req, []byte(echo))
-	svr.Send(&server.Source{Appid: req.Appid}, &server.Data{Api: "on", Data: []byte{}})
+	notify(svr, req)
+}
+
+func notify(svr server.Server, req *server.Request) {
+	if req.Appid == appidOne {
+		return
+	}
+
+	svr.Send(&server.Source{Appid: req.Appid}, &server.Data{Api: ""})
 }

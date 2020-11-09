@@ -18,42 +18,124 @@ func (h HandlerFunc) Serve(svr Server, req *Request) {
 	h(svr, req)
 }
 
+type HandlerSourceType int
+type HandlerSource struct {
+	Type  HandlerSourceType
+	Appid string
+}
+
+const (
+	HandlerSourceTypeBoth   HandlerSourceType = 0
+	HandlerSourceTypeUser   HandlerSourceType = 1
+	HandlerSourceTypeServer HandlerSourceType = 2
+)
+
+const (
+	HandlerSourceAppidOwn = "."
+	HandlerSourceAppidAll = "*"
+)
+
+var (
+	HandlerSourceAll       = HandlerSource{Type: HandlerSourceTypeBoth, Appid: HandlerSourceAppidAll}
+	HandlerSourceAllUser   = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidAll}
+	HandlerSourceAllServer = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidAll}
+	HandlerSourceOwnUser   = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidOwn}
+	HandlerSourceOwnServer = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidOwn}
+)
+
+type sourceHandler struct {
+	own   Handler
+	other map[string]Handler
+	all   Handler
+}
+
+func newSourceHandler() *sourceHandler {
+	return &sourceHandler{other: make(map[string]Handler)}
+}
+
+func (s *sourceHandler) addHandler(appid string, h Handler) {
+	switch appid {
+	case HandlerSourceAppidOwn:
+		s.own = h
+	case HandlerSourceAppidAll:
+		s.all = h
+	default:
+		s.other[appid] = h
+	}
+}
+
+func (s *sourceHandler) getHandler(svr Server, req *Request) Handler {
+	if svr.GetAddr().AppID == req.Appid {
+		if s.own != nil {
+			return s.own
+		}
+	} else {
+		if h, ok := s.other[req.Appid]; ok {
+			return h
+		}
+	}
+	return s.all
+}
+
 // ServeMux is an XDP request multiplexer.
 type ServeMux struct {
 	mtx sync.RWMutex
 
-	hs map[string]Handler
+	handlers []map[string]*sourceHandler
 }
 
 // NewServeMux create *ServeMux
 func NewServeMux() *ServeMux {
 	sm := new(ServeMux)
-	sm.hs = make(map[string]Handler)
+	sm.handlers = make([]map[string]*sourceHandler, HandlerSourceTypeServer+1)
+	for i := HandlerSourceTypeBoth; i <= HandlerSourceTypeServer; i++ {
+		sm.handlers[HandlerSourceTypeBoth] = make(map[string]*sourceHandler)
+	}
 	return sm
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) HandleFunc(pattern string, h HandlerFunc) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-
-	s.hs[pattern] = h
+func (s *ServeMux) HandleFunc(source HandlerSource, pattern string, h HandlerFunc) {
+	s.Handle(source, pattern, h)
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) Handle(pattern string, h Handler) {
+func (s *ServeMux) Handle(source HandlerSource, pattern string, h Handler) {
+	if source.Type < HandlerSourceTypeBoth || source.Type > HandlerSourceTypeServer {
+		panic("invalid source type")
+	}
+
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	s.hs[pattern] = h
+	hs := s.handlers[source.Type]
+	sh, ok := hs[pattern]
+	if !ok {
+		sh = newSourceHandler()
+		hs[pattern] = sh
+	}
+	sh.addHandler(source.Appid, h)
 }
 
-func (s *ServeMux) getHandler(api string) Handler {
+func (s *ServeMux) getHandler(svr Server, req *Request) Handler {
+	fn := func(stype HandlerSourceType) Handler {
+		if sh, ok := s.handlers[stype][req.Api]; ok {
+			return sh.getHandler(svr, req)
+		}
+		return nil
+	}
+
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 
-	h := s.hs[api]
-	return h
+	stype := HandlerSourceTypeServer
+	if req.Sid != "" {
+		stype = HandlerSourceTypeUser
+	}
+	if h := fn(stype); h != nil {
+		return h
+	}
+	return fn(HandlerSourceTypeBoth)
 }
 
 // Serve implement Handler.Serve
@@ -63,7 +145,7 @@ func (s *ServeMux) Serve(svr Server, req *Request) {
 		svr.GetLogger().Debug("[XDP] serve %s cost %dms", req.Api, ms)
 	}()
 
-	h := s.getHandler(req.Api)
+	h := s.getHandler(svr, req)
 	if h == nil {
 		svr.ReplyError(req, 1, "")
 		return
@@ -74,10 +156,10 @@ func (s *ServeMux) Serve(svr Server, req *Request) {
 var defaultServeMux = NewServeMux()
 
 // HandleFunc call defaultServeMux.HandleFunc
-func HandleFunc(pattern string, h HandlerFunc) {
-	defaultServeMux.HandleFunc(pattern, h)
+func HandleFunc(source HandlerSource, pattern string, h HandlerFunc) {
+	defaultServeMux.HandleFunc(source, pattern, h)
 }
 
-func Handle(pattern string, h Handler) {
-	defaultServeMux.Handle(pattern, h)
+func Handle(source HandlerSource, pattern string, h Handler) {
+	defaultServeMux.Handle(source, pattern, h)
 }
