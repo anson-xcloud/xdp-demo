@@ -19,6 +19,9 @@ func (h HandlerFunc) Serve(svr Server, req *Request) {
 }
 
 type HandlerSourceType int
+
+// HandlerSource handle source condition
+// note: Anonymous donot have HandlerSourceTypeServer
 type HandlerSource struct {
 	Type  HandlerSourceType
 	Appid string
@@ -31,22 +34,27 @@ const (
 )
 
 const (
-	HandlerSourceAppidOwn = "."
-	HandlerSourceAppidAll = "*"
+	HandlerSourceAppidOwn       = "."
+	HandlerSourceAppidAnonymous = "?"
+	HandlerSourceAppidAll       = "*"
 )
 
 var (
-	HandlerSourceAll       = HandlerSource{Type: HandlerSourceTypeBoth, Appid: HandlerSourceAppidAll}
-	HandlerSourceAllUser   = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidAll}
-	HandlerSourceAllServer = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidAll}
-	HandlerSourceOwnUser   = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidOwn}
-	HandlerSourceOwnServer = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidOwn}
+	HandlerSourceAnonymousUser = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidAnonymous}
+	HandlerSourceAll           = HandlerSource{Type: HandlerSourceTypeBoth, Appid: HandlerSourceAppidAll}
+	HandlerSourceAllUser       = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidAll}
+	HandlerSourceAllServer     = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidAll}
+	HandlerSourceOwnUser       = HandlerSource{Type: HandlerSourceTypeUser, Appid: HandlerSourceAppidOwn}
+	HandlerSourceOwnServer     = HandlerSource{Type: HandlerSourceTypeServer, Appid: HandlerSourceAppidOwn}
 )
 
+// sourceHandler handler depend on source
+// own, anonymous, other will be selected first, if not found, then get all
 type sourceHandler struct {
-	own   Handler
-	other map[string]Handler
-	all   Handler
+	own, anonymous Handler
+	other          map[string]Handler
+
+	all Handler
 }
 
 func newSourceHandler() *sourceHandler {
@@ -55,6 +63,8 @@ func newSourceHandler() *sourceHandler {
 
 func (s *sourceHandler) addHandler(appid string, h Handler) {
 	switch appid {
+	case HandlerSourceAppidAnonymous:
+		s.anonymous = h
 	case HandlerSourceAppidOwn:
 		s.own = h
 	case HandlerSourceAppidAll:
@@ -65,14 +75,18 @@ func (s *sourceHandler) addHandler(appid string, h Handler) {
 }
 
 func (s *sourceHandler) getHandler(svr Server, req *Request) Handler {
-	if svr.GetAddr().AppID == req.Appid {
-		if s.own != nil {
-			return s.own
-		}
-	} else {
-		if h, ok := s.other[req.Appid]; ok {
-			return h
-		}
+	var h Handler
+	switch req.Appid {
+	case "":
+		h = s.anonymous
+	case svr.GetAddr().AppID:
+		h = s.own
+	default:
+		h = s.other[req.Appid]
+	}
+
+	if h != nil {
+		return h
 	}
 	return s.all
 }
@@ -89,7 +103,7 @@ func NewServeMux() *ServeMux {
 	sm := new(ServeMux)
 	sm.handlers = make([]map[string]*sourceHandler, HandlerSourceTypeServer+1)
 	for i := HandlerSourceTypeBoth; i <= HandlerSourceTypeServer; i++ {
-		sm.handlers[HandlerSourceTypeBoth] = make(map[string]*sourceHandler)
+		sm.handlers[i] = make(map[string]*sourceHandler)
 	}
 	return sm
 }

@@ -18,7 +18,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/_examples/echo/server/main.go",
+            "program": "${workspaceRoot}/_examples/echo/server",
             "cwd": "${workspaceRoot}/_examples/echo/server",
             "env": {},
             "args": []
@@ -28,7 +28,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceRoot}/_examples/echo/client/main.go",
+            "program": "${workspaceRoot}/_examples/echo/client",
             "cwd": "${workspaceRoot}/_examples/echo/client",
             "env": {},
             "args": []
