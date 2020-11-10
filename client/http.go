@@ -32,7 +32,7 @@ func (h *httpClient) Serve(appid string) error {
 }
 
 func (h *httpClient) Get(req *Request) ([]byte, error) {
-	addr := fmt.Sprintf("%s%s%s", config.XCloudAddr, config.APIClientXdpPrefix, h.appid)
+	addr := fmt.Sprintf("%s%s%s", config.XCloudAddr, config.APIClientXdpPrefix, req.Appid)
 	httpReq, err := http.NewRequest(http.MethodPost, addr, bytes.NewBuffer(req.Data))
 	if err != nil {
 		return nil, err

@@ -15,7 +15,7 @@ enum Cmd {
   CmdGet = 22;
 }
 
-message Source {
+message Remote {
   string sid = 1;
   string appid = 2;
 
@@ -32,12 +32,12 @@ message Data {
 }
 
 message Message {
-  Source source = 1;
+  Remote remote = 1;
   Data data = 2;
 }
 
 message MultiMessage {
-  repeated Source sources = 1;
+  repeated Remote remotes = 1;
   Data data = 2;
 }
 

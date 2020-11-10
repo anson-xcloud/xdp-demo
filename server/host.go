@@ -10,9 +10,9 @@ type HostSetting struct {
 	AllowServerApis map[string]struct{}
 }
 
-func (h *HostSetting) isAllow(source *apipb.Source, api string) bool {
+func (h *HostSetting) isAllow(remote *apipb.Remote, api string) bool {
 	var allowed map[string]struct{}
-	if source.Sid != "" {
+	if remote.Sid != "" {
 		allowed = h.AllowUserApis
 	} else {
 		allowed = h.AllowServerApis

@@ -31,8 +31,8 @@ const (
 	XdpPost = "POST"
 )
 
-type Source apipb.Source
-type SourceSlice []*apipb.Source
+type Remote apipb.Remote
+type RemoteSlice []*apipb.Remote
 type Data apipb.Data
 
 // Address for app address token
@@ -56,7 +56,7 @@ func ParseAddress(addr string) (*Address, error) {
 }
 
 type Request struct {
-	*Source
+	*Remote
 
 	*Data
 
@@ -85,11 +85,11 @@ type Server interface {
 
 	// Send send data to target, support any target,
 	// when send to host user/server, need host setting allow
-	Send(source *Source, data *Data) error
+	Send(remote *Remote, data *Data) error
 
 	// Send send data to multi target, support any target,
 	// when send to any host user/server, need host setting allow
-	MultiSend(sources SourceSlice, data *Data) error
+	MultiSend(remotes RemoteSlice, data *Data) error
 
 	// Get will wait until return
 	// note: you can only get from host server / plugin server
@@ -101,7 +101,7 @@ func Serve(addr string) error {
 }
 
 func Send(appid, api string, data []byte) {
-	defaultSvr.Send(&Source{Appid: appid}, &Data{Api: api, Data: data})
+	defaultSvr.Send(&Remote{Appid: appid}, &Data{Api: api, Data: data})
 }
 
 func Get(appid string, api string, data []byte) ([]byte, error) {
@@ -202,49 +202,49 @@ func (x *xdpServer) ReplyError(req *Request, ec uint32, msg string) {
 	x.writePacket(&p)
 }
 
-func (x *xdpServer) Send(source *Source, data *Data) error {
-	pbs := (*apipb.Source)(source)
+func (x *xdpServer) Send(remote *Remote, data *Data) error {
+	pbs := (*apipb.Remote)(remote)
 	if !x.isApiAllow(data.Api, pbs) {
 		return ErrApiNowAllowed
 	}
 
 	var m apipb.Message
-	m.Source = pbs
+	m.Remote = pbs
 	m.Data = (*apipb.Data)(data)
 	return x.write(apipb.Cmd_CmdSend, &m)
 }
 
 // MultiSend multi send data to session at once
-func (x *xdpServer) MultiSend(sources SourceSlice, data *Data) error {
-	if !x.isApiAllow(data.Api, sources...) {
+func (x *xdpServer) MultiSend(remotes RemoteSlice, data *Data) error {
+	if !x.isApiAllow(data.Api, remotes...) {
 		return ErrApiNowAllowed
 	}
 
 	var m apipb.MultiMessage
-	m.Sources = ([]*apipb.Source)(sources)
+	m.Remotes = ([]*apipb.Remote)(remotes)
 	m.Data = (*apipb.Data)(data)
 	return x.write(apipb.Cmd_CmdMultiSend, &m)
 }
 
 func (x *xdpServer) Get(appid string, data *Data) ([]byte, error) {
-	pbs := &apipb.Source{Appid: appid}
+	pbs := &apipb.Remote{Appid: appid}
 	if !x.isApiAllow(data.Api, pbs) {
 		return nil, ErrApiNowAllowed
 	}
 
 	var m apipb.Message
-	m.Source = pbs
+	m.Remote = pbs
 	m.Data = (*apipb.Data)(data)
 	return x.call(apipb.Cmd_CmdGet, &m)
 }
 
-func (x *xdpServer) isApiAllow(api string, sources ...*apipb.Source) bool {
+func (x *xdpServer) isApiAllow(api string, remotes ...*apipb.Remote) bool {
 	x.RLock()
 	defer x.RUnlock()
 
-	for _, source := range sources {
-		setting, ok := x.hosts[source.Appid]
-		if ok && !setting.isAllow(source, api) {
+	for _, remote := range remotes {
+		setting, ok := x.hosts[remote.Appid]
+		if ok && !setting.isAllow(remote, api) {
 			return false
 		}
 	}
@@ -350,7 +350,7 @@ func (x *xdpServer) processRecv(p *network.Packet) {
 	}
 
 	var req Request
-	req.Source = (*Source)(notify.Source)
+	req.Remote = (*Remote)(notify.Remote)
 	req.Data = (*Data)(notify.Data)
 	req.reqTime = time.Now()
 	req.pid = p.ID

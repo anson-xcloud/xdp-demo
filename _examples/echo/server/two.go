@@ -6,7 +6,7 @@ var count int
 
 // apptwo has install plugin support by appone
 func appTwo() error {
-	appOneServer := server.HandlerSource{Type: server.HandlerSourceTypeServer, Appid: appidOne}
+	appOneServer := server.HandlerRemote{Type: server.HandlerRemoteTypeServer, Appid: appidOne}
 
 	sm := server.NewServeMux()
 	sm.HandleFunc(appOneServer, "", onApp1Echo)

@@ -11,7 +11,7 @@ const appidOne = "app1"
 
 func appOne() error {
 	sm := server.NewServeMux()
-	sm.HandleFunc(server.HandlerSourceAllUser, "", echo)
+	sm.HandleFunc(server.HandlerRemoteAllUser, "", echo)
 
 	svr := server.NewServer(server.WithHandler(sm))
 	return svr.Serve(appidOne + ":key1")
@@ -34,5 +34,5 @@ func notify(svr server.Server, req *server.Request) {
 		return
 	}
 
-	svr.Send(&server.Source{Appid: req.Appid}, &server.Data{Api: ""})
+	svr.Send(&server.Remote{Appid: req.Appid}, &server.Data{Api: ""})
 }

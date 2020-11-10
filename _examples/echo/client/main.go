@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	const appid = "app1"
+	const appid = "app2"
 
 	if err := client.Serve(appid); err != nil {
 		logger.Error(err.Error())
@@ -22,6 +22,7 @@ func main() {
 	}
 
 	req := client.BuildRequest()
+	req.Appid = "app1"
 	req.Data = []byte("hello")
 	for range time.NewTicker(time.Second * 3).C {
 		data, err := client.Get(req)

@@ -10,7 +10,7 @@ func hello(svr server.Server, req *server.Request) {
 }
 
 func main() {
-	server.HandleFunc(server.HandlerSourceAll, "", hello)
+	server.HandleFunc(server.HandlerRemoteAll, "", hello)
 
 	if err := server.Serve("appid:appkey"); err != nil {
 		logger.Error("%s", err)
