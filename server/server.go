@@ -14,6 +14,9 @@ import (
 	"time"
 
 	apipb "github.com/anson-xcloud/xdp-demo/api"
+	"github.com/anson-xcloud/xdp-demo/config"
+	"github.com/anson-xcloud/xdp-demo/pkg/logger"
+	"github.com/anson-xcloud/xdp-demo/pkg/network"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -63,7 +66,7 @@ type Request struct {
 }
 
 type Server interface {
-	GetLogger() Logger
+	GetLogger() logger.Logger
 
 	GetAddr() *Address
 
@@ -113,7 +116,7 @@ type xdpServer struct {
 
 	addr *Address
 
-	conn *Connection
+	conn *network.Connection
 
 	// settings about who host current app as plugin
 	hosts map[string]*HostSetting
@@ -132,7 +135,7 @@ func NewServer(opt ...Option) Server {
 }
 
 // Logger implement server.GetLogger
-func (x *xdpServer) GetLogger() Logger {
+func (x *xdpServer) GetLogger() logger.Logger {
 	return x.opts.Logger
 }
 
@@ -154,7 +157,7 @@ func (x *xdpServer) Serve(addr string) error {
 		return err
 	}
 
-	conn := newConnection()
+	conn := network.NewConnection()
 	conn.Logger = x.opts.Logger
 	if err := conn.Connect(ap.Addr); err != nil {
 		return err
@@ -170,7 +173,7 @@ func (x *xdpServer) Serve(addr string) error {
 		}
 		x.conn = conn
 	}()
-	return conn.recv(x.process)
+	return conn.Recv(x.process)
 }
 
 // Reply implement Server.Reply
@@ -179,9 +182,9 @@ func (x *xdpServer) Reply(req *Request, data []byte) {
 		return
 	}
 
-	var p Packet
+	var p network.Packet
 	p.ID = req.pid
-	p.Flag |= flagRPCResponse
+	p.Flag |= network.FlagRPCResponse
 	p.Data = data
 	x.writePacket(&p)
 }
@@ -191,9 +194,9 @@ func (x *xdpServer) ReplyError(req *Request, ec uint32, msg string) {
 		return
 	}
 
-	var p Packet
+	var p network.Packet
 	p.ID = req.pid
-	p.Flag |= flagRPCResponse
+	p.Flag |= network.FlagRPCResponse
 	p.Ec = ec
 	// p.EcMsg=msg
 	x.writePacket(&p)
@@ -248,7 +251,7 @@ func (x *xdpServer) isApiAllow(api string, sources ...*apipb.Source) bool {
 	return true
 }
 
-func (x *xdpServer) process(p *Packet) {
+func (x *xdpServer) process(p *network.Packet) {
 	go func() {
 		switch p.Cmd {
 		case uint32(apipb.Cmd_CmdRecv):
@@ -276,7 +279,7 @@ func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	values := make(url.Values)
 	values.Set("appid", x.addr.AppID)
 	x.signURL(values)
-	url := fmt.Sprintf("%s%s?%s", XCloudAddr, APIAccessPoint, values.Encode())
+	url := fmt.Sprintf("%s%s?%s", config.XCloudAddr, config.APIAccessPoint, values.Encode())
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -307,13 +310,13 @@ func (x *xdpServer) call(cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
 	return call(x.conn, cmd, pm)
 }
 
-func call(conn *Connection, cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
+func call(conn *network.Connection, cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return nil, err
 	}
 
-	var p Packet
+	var p network.Packet
 	p.Cmd = uint32(cmd)
 	p.Data = bs
 	rp, err := conn.Call(context.Background(), &p)
@@ -329,17 +332,17 @@ func (x *xdpServer) write(cmd apipb.Cmd, pm proto.Message) error {
 		return err
 	}
 
-	var p Packet
+	var p network.Packet
 	p.Cmd = uint32(apipb.Cmd_CmdSend)
 	p.Data = bs
 	return x.writePacket(&p)
 }
 
-func (x *xdpServer) writePacket(p *Packet) error {
-	return x.conn.write(p)
+func (x *xdpServer) writePacket(p *network.Packet) error {
+	return x.conn.Write(p)
 }
 
-func (x *xdpServer) processRecv(p *Packet) {
+func (x *xdpServer) processRecv(p *network.Packet) {
 	var notify apipb.Message
 	if err := proto.Unmarshal(p.Data, &notify); err != nil {
 		x.opts.Logger.Debug("unmarshal handleData error:%s", err)
@@ -351,5 +354,5 @@ func (x *xdpServer) processRecv(p *Packet) {
 	req.Data = (*Data)(notify.Data)
 	req.reqTime = time.Now()
 	req.pid = p.ID
-	x.opts.Handler2.Serve(x, &req)
+	x.opts.Handler.Serve(x, &req)
 }

@@ -2,24 +2,29 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"time"
 
-	"github.com/anson-xcloud/xdp-demo"
+	"github.com/anson-xcloud/xdp-demo/client"
+	"github.com/anson-xcloud/xdp-demo/pkg/logger"
 )
 
 func main() {
-	const appid = "1"
+	const appid = "app1"
 
-	headers := make(url.Values)
-	headers.Set("msg", "hello")
+	if err := client.Serve(appid); err != nil {
+		logger.Error(err.Error())
+		return
+	}
 
-	cli, _ := xdp.Login(appid, "user", "pwd")
+	if err := client.Login("user", "pwd"); err != nil {
+		logger.Error(err.Error())
+		return
+	}
 
-	time.Sleep(time.Second)
-
+	req := client.BuildRequest()
+	req.Data = []byte("hello")
 	for range time.NewTicker(time.Second * 3).C {
-		data, err := cli.Get("", headers)
+		data, err := client.Get(req)
 		fmt.Println("echo: ", string(data), err)
 	}
 }

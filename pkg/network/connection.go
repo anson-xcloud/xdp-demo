@@ -1,80 +1,15 @@
-package server
+package network
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
-	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/anson-xcloud/xdp-demo/pkg/logger"
 )
-
-const flagRPCResponse = 0x1
-
-var (
-	packetbo = binary.LittleEndian
-)
-
-// Packet xcloud packet define
-// TODO
-// adjust like http header
-// Proto      string // XDP/1
-// ProtoMajor int
-// ProtoMinor int
-type Packet struct {
-	Length uint32
-	Flag   uint32
-	ID     uint32
-	Ec     uint32
-	Cmd    uint32
-	Data   []byte
-}
-
-func (p *Packet) Write(writer io.Writer) error {
-	if err := binary.Write(writer, packetbo, &p.Length); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, packetbo, &p.ID); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, packetbo, &p.Flag); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, packetbo, &p.Ec); err != nil {
-		return err
-	}
-	if err := binary.Write(writer, packetbo, &p.Cmd); err != nil {
-		return err
-	}
-	// TODO
-	// 暂时忽略n
-	_, err := writer.Write(p.Data)
-	return err
-}
-
-func (p *Packet) Read(reader io.Reader) error {
-	if err := binary.Read(reader, packetbo, &p.Length); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, packetbo, &p.ID); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, packetbo, &p.Flag); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, packetbo, &p.Ec); err != nil {
-		return err
-	}
-	if err := binary.Read(reader, packetbo, &p.Cmd); err != nil {
-		return err
-	}
-
-	p.Data = make([]byte, p.Length)
-	_, err := io.ReadFull(reader, p.Data)
-	return err
-}
 
 type caller struct {
 	id uint32
@@ -89,7 +24,7 @@ func newCaller() *caller {
 
 // Connection tcp connection
 type Connection struct {
-	Logger
+	logger.Logger
 
 	mtx sync.Mutex
 
@@ -102,7 +37,7 @@ type Connection struct {
 	callers map[uint32]*caller
 }
 
-func newConnection() *Connection {
+func NewConnection() *Connection {
 	conn := new(Connection)
 	conn.callers = make(map[uint32]*caller)
 	return conn
@@ -120,7 +55,7 @@ func (c *Connection) Connect(addr string) error {
 	return nil
 }
 
-func (c *Connection) recv(handler func(p *Packet)) error {
+func (c *Connection) Recv(handler func(p *Packet)) error {
 	nc := c.nc
 	for {
 		var p Packet
@@ -133,7 +68,7 @@ func (c *Connection) recv(handler func(p *Packet)) error {
 			return err
 		}
 
-		if p.Flag&flagRPCResponse == 0 {
+		if p.Flag&FlagRPCResponse == 0 {
 			handler(&p)
 			continue
 		}
@@ -169,7 +104,7 @@ func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 	c.mtx.Unlock()
 
 	p.ID = caller.id
-	if err := c.write(p); err != nil {
+	if err := c.Write(p); err != nil {
 		return nil, err
 	}
 
@@ -192,7 +127,7 @@ func (c *Connection) Call(ctx context.Context, p *Packet) (*Packet, error) {
 	}
 }
 
-func (c *Connection) write(p *Packet) error {
+func (c *Connection) Write(p *Packet) error {
 	p.Length = uint32(len(p.Data))
 	if err := p.Write(c.nc); err != nil {
 		return err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/anson-xcloud/xdp-demo/pkg/logger"
 	"github.com/anson-xcloud/xdp-demo/server"
 )
 
@@ -12,7 +13,7 @@ func main() {
 	server.HandleFunc(server.HandlerSourceAll, "", hello)
 
 	if err := server.Serve("appid:appkey"); err != nil {
-		server.Error("%s", err)
+		logger.Error("%s", err)
 		return
 	}
 }

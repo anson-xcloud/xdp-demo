@@ -3,6 +3,8 @@ package server
 import (
 	"io/ioutil"
 	"os"
+
+	"github.com/anson-xcloud/xdp-demo/pkg/logger"
 )
 
 // Option server option
@@ -10,30 +12,30 @@ type Option func(*Options)
 
 // Options server all options
 type Options struct {
-	Handler2 Handler
+	Handler Handler
 
-	Logger Logger
+	Logger logger.Logger
 
 	// Config xcloud config
 	Config string
 }
 
 var defaultOptions = Options{
-	Handler2: defaultServeMux,
-	Logger:   defaultLogger,
+	Handler: defaultServeMux,
+	Logger:  logger.Default,
 }
 
 // WithHandler set handler
 // if dont set, default use *ServeMux
 func WithHandler(h Handler) Option {
 	return func(opts *Options) {
-		opts.Handler2 = h
+		opts.Handler = h
 	}
 }
 
 // WithLogger set logger
 // if dont set, default use *fmtLogger
-func WithLogger(l Logger) Option {
+func WithLogger(l logger.Logger) Option {
 	return func(opts *Options) {
 		opts.Logger = l
 	}

@@ -1,14 +1,14 @@
-package server
+package logger
 
 import (
 	"fmt"
 	"time"
 )
 
-var defaultLogger Logger
+var Default Logger
 
 func init() {
-	defaultLogger = new(fmtLogger)
+	Default = new(fmtLogger)
 }
 
 // Logger xdp logger
@@ -23,11 +23,11 @@ type Logger interface {
 }
 
 func Info(format string, args ...interface{}) {
-	defaultLogger.Info(format, args...)
+	Default.Info(format, args...)
 }
 
 func Error(format string, args ...interface{}) {
-	defaultLogger.Error(format, args...)
+	Default.Error(format, args...)
 }
 
 type fmtLogger struct {
