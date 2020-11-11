@@ -35,6 +35,10 @@ type Remote apipb.Remote
 type RemoteSlice []*apipb.Remote
 type Data apipb.Data
 
+func IsValidRemote(remote *Remote) bool {
+	return remote.Sid != "" || remote.Appid != ""
+}
+
 // Address for app address token
 // format is   appid:appsecret
 type Address struct {
@@ -203,6 +207,10 @@ func (x *xdpServer) ReplyError(req *Request, ec uint32, msg string) {
 }
 
 func (x *xdpServer) Send(remote *Remote, data *Data) error {
+	if !IsValidRemote(remote) {
+		return ErrInvalidRemote
+	}
+
 	pbs := (*apipb.Remote)(remote)
 	if !x.isApiAllow(data.Api, pbs) {
 		return ErrApiNowAllowed
@@ -216,6 +224,12 @@ func (x *xdpServer) Send(remote *Remote, data *Data) error {
 
 // MultiSend multi send data to session at once
 func (x *xdpServer) MultiSend(remotes RemoteSlice, data *Data) error {
+	for _, remote := range remotes {
+		if !IsValidRemote((*Remote)(remote)) {
+			return ErrInvalidRemote
+		}
+	}
+
 	if !x.isApiAllow(data.Api, remotes...) {
 		return ErrApiNowAllowed
 	}

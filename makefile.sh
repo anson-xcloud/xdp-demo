@@ -16,6 +16,10 @@ make_client() {
     go run ./_examples/echo/client
 }
 
+make_server() {
+    go run ./_examples/echo/server
+}
+
 case $1 in
 "api")
     make_api
@@ -25,5 +29,8 @@ case $1 in
     ;;
 "client")
     make_client
+    ;;
+"server")
+    make_server
     ;;
 esac

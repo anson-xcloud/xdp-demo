@@ -16,6 +16,8 @@ var (
 	ErrTimeout = errors.New("timeout")
 
 	ErrApiNowAllowed = errors.New("api donot allowed")
+
+	ErrInvalidRemote = errors.New("invalid remote")
 )
 
 type StatusError struct {
