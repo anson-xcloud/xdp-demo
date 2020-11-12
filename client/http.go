@@ -12,6 +12,11 @@ import (
 	"github.com/anson-xcloud/xdp-demo/config"
 )
 
+const (
+	headerPrefix = "Xcloud-"
+	headerAppid  = headerPrefix + "Appid"
+)
+
 type httpClient struct {
 	sync.RWMutex
 
@@ -37,7 +42,7 @@ func (h *httpClient) Get(req *Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Headers["xcloud_appid"] = h.appid
+	req.Headers[headerAppid] = h.appid
 	for k, v := range req.Headers {
 		httpReq.Header.Set(k, v)
 	}
