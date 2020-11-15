@@ -23,7 +23,7 @@ func New() Client {
 	return new(xdpClient)
 }
 
-func (x *xdpClient) Serve(appid string) error {
+func (x *xdpClient) Connect(appid string) error {
 	x.appid = appid
 	return nil
 }

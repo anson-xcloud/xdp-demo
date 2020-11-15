@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/anson-xcloud/xdp-demo/client"
@@ -9,9 +8,10 @@ import (
 )
 
 func main() {
-	const appid = "app2"
+	const mainAppid = "appmain"
+	const pluginAppid = "appplugin"
 
-	if err := client.Serve(appid); err != nil {
+	if err := client.Connect(mainAppid); err != nil {
 		logger.Error(err.Error())
 		return
 	}
@@ -22,10 +22,17 @@ func main() {
 	}
 
 	req := client.BuildRequest()
-	req.Appid = "app1"
+	req.Appid = pluginAppid
 	req.Data = []byte("hello")
-	for range time.NewTicker(time.Second * 3).C {
-		data, err := client.Get(req)
-		fmt.Println("echo: ", string(data), err)
+	t := time.NewTicker(time.Second * 3)
+	for range t.C {
+		st := time.Now()
+
+		if data, err := client.Get(req); err != nil {
+			client.GetLogger().Error("hello err:%s", err)
+		} else {
+			sec := time.Since(st).Seconds()
+			client.GetLogger().Info("hello cost %.3f, msg: %s", sec, data)
+		}
 	}
 }

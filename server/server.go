@@ -112,6 +112,19 @@ func Get(appid string, api string, data []byte) ([]byte, error) {
 	return defaultSvr.Get(appid, &Data{Api: api, Data: data})
 }
 
+func GetLogger() logger.Logger {
+	return defaultSvr.GetLogger()
+}
+
+func ReplyJson(svr Server, req *Request, data interface{}) error {
+	bdata, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	svr.Reply(req, bdata)
+	return nil
+}
+
 // xdpServer for app server
 type xdpServer struct {
 	sync.RWMutex
@@ -120,6 +133,7 @@ type xdpServer struct {
 
 	addr *Address
 
+	// TODO check nil
 	conn *network.Connection
 
 	// settings about who host current app as plugin
@@ -176,6 +190,8 @@ func (x *xdpServer) Serve(addr string) error {
 			return
 		}
 		x.conn = conn
+
+		x.opts.Logger.Info("start serve xdp app %s ... ", x.addr.AppID)
 	}()
 	return conn.Recv(x.process)
 }

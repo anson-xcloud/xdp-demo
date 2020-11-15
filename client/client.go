@@ -1,5 +1,7 @@
 package client
 
+import "github.com/anson-xcloud/xdp-demo/pkg/logger"
+
 var defaultClient Client
 
 func init() {
@@ -17,8 +19,12 @@ func BuildRequest() *Request {
 	return &Request{Headers: make(map[string]string)}
 }
 
+func GetLogger() logger.Logger {
+	return logger.Default
+}
+
 type Client interface {
-	Serve(appid string) error
+	Connect(appid string) error
 
 	Get(req *Request) ([]byte, error)
 
@@ -28,8 +34,8 @@ type Client interface {
 	Login(user, pwd string) error
 }
 
-func Serve(appid string) error {
-	return defaultClient.Serve(appid)
+func Connect(appid string) error {
+	return defaultClient.Connect(appid)
 }
 
 func Get(req *Request) ([]byte, error) {

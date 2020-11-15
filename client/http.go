@@ -31,7 +31,7 @@ func NewHttpClient() Client {
 	return new(httpClient)
 }
 
-func (h *httpClient) Serve(appid string) error {
+func (h *httpClient) Connect(appid string) error {
 	h.appid = appid
 	return nil
 }

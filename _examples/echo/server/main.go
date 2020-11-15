@@ -5,9 +5,8 @@ import (
 )
 
 func main() {
-	// appone 是插件app、  apptwo是主app
 	eg := new(errgroup.Group)
-	eg.Go(appOne)
-	eg.Go(appTwo)
+	eg.Go(appMain)   // 主app
+	eg.Go(appPlugin) // 插件app
 	eg.Wait()
 }

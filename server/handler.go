@@ -154,14 +154,16 @@ func (s *ServeMux) getHandler(svr Server, req *Request) Handler {
 
 // Serve implement Handler.Serve
 func (s *ServeMux) Serve(svr Server, req *Request) {
+	var ec uint32
 	defer func() {
-		ms := time.Since(req.reqTime).Milliseconds()
-		svr.GetLogger().Debug("[XDP] server %s serve %s cost %dms", svr.GetAddr().AppID, req.Api, ms)
+		ts := time.Since(req.reqTime).Seconds()
+		svr.GetLogger().Debug("[XDP] %s serve %s cost %.3fs, ec(%d)", svr.GetAddr().AppID, req.Api, ts, ec)
 	}()
 
 	h := s.getHandler(svr, req)
 	if h == nil {
-		svr.ReplyError(req, 1, "")
+		ec = 100
+		svr.ReplyError(req, ec, "")
 		return
 	}
 	h.Serve(svr, req)
