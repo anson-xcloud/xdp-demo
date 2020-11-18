@@ -100,6 +100,10 @@ type Server interface {
 	Get(appid string, data *Data) ([]byte, error)
 }
 
+func SetEnv(env string) {
+	config.SetEnv(env)
+}
+
 func Serve(addr string) error {
 	return defaultSvr.Serve(addr)
 }
@@ -309,7 +313,7 @@ func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	values := make(url.Values)
 	values.Set("appid", x.addr.AppID)
 	x.signURL(values)
-	url := fmt.Sprintf("%s%s?%s", config.XCloudAddr, config.APIAccessPoint, values.Encode())
+	url := fmt.Sprintf("%s%s?%s", config.Env.XcloudAddr, config.APIAccessPoint, values.Encode())
 
 	resp, err := http.Get(url)
 	if err != nil {

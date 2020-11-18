@@ -37,7 +37,7 @@ func (h *httpClient) Connect(appid string) error {
 }
 
 func (h *httpClient) Get(req *Request) ([]byte, error) {
-	addr := fmt.Sprintf("%s%s%s", config.XCloudAddr, config.APIClientXdpPrefix, req.Appid)
+	addr := fmt.Sprintf("%s%s%s", config.Env.XcloudAddr, config.APIClientXdpPrefix, req.Appid)
 	httpReq, err := http.NewRequest(http.MethodPost, addr, bytes.NewBuffer(req.Data))
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (h *httpClient) Login(user, pwd string) error {
 	vals := make(url.Values)
 	vals.Add("user", user)
 	vals.Add("pwd", pwd)
-	addr := fmt.Sprintf("%s%s?%s", config.XCloudAddr, config.APIUserLogin, vals.Encode())
+	addr := fmt.Sprintf("%s%s?%s", config.Env.XcloudAddr, config.APIUserLogin, vals.Encode())
 	req, err := http.NewRequest(http.MethodGet, addr, nil)
 	if err != nil {
 		return err

@@ -8,6 +8,8 @@ import (
 )
 
 func main() {
+	client.SetEnv("debug")
+
 	const mainAppid = "appmain"
 	const pluginAppid = "appplugin"
 

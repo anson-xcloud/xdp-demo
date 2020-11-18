@@ -59,7 +59,7 @@ func (c *xdpClient) Login(user, pwd string) error {
 }
 
 func (c *xdpClient) getAppAddr() (string, error) {
-	addr := fmt.Sprintf("%s%s%s ", config.XCloudAddr, config.APIUserGetAccessPoint, c.appid)
+	addr := fmt.Sprintf("%s%s%s ", config.Env.XcloudAddr, config.APIUserGetAccessPoint, c.appid)
 	resp, err := http.Get(addr)
 	if err != nil {
 		return "", err
