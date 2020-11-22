@@ -1,6 +1,7 @@
 package server
 
 import (
+	"container/list"
 	"sync"
 	"time"
 )
@@ -28,9 +29,17 @@ type HandlerRemote struct {
 }
 
 const (
-	HandlerRemoteTypeBoth   HandlerRemoteType = 0
-	HandlerRemoteTypeUser   HandlerRemoteType = 1
-	HandlerRemoteTypeServer HandlerRemoteType = 2
+	handlerRemoteTypeUserBitsize = iota
+	handlerRemoteTypeServerBitsize
+	handlerRemoteTypeXcloudBitsize
+)
+
+const (
+	HandlerRemoteTypeUser         HandlerRemoteType = 1 << handlerRemoteTypeUserBitsize
+	HandlerRemoteTypeServer       HandlerRemoteType = 1 << handlerRemoteTypeServerBitsize
+	HandlerRemoteTypeXcloud       HandlerRemoteType = 1 << handlerRemoteTypeXcloudBitsize
+	HandlerRemoteTypeUserOrServer HandlerRemoteType = HandlerRemoteTypeUser | HandlerRemoteTypeServer
+	HandlerRemoteTypeAll          HandlerRemoteType = HandlerRemoteTypeUserOrServer | HandlerRemoteTypeXcloud
 )
 
 const (
@@ -41,115 +50,125 @@ const (
 
 var (
 	HandlerRemoteAnonymousUser = HandlerRemote{Type: HandlerRemoteTypeUser, Appid: HandlerRemoteAppidAnonymous}
-	HandlerRemoteAll           = HandlerRemote{Type: HandlerRemoteTypeBoth, Appid: HandlerRemoteAppidAll}
+	HandlerRemoteAll           = HandlerRemote{Type: HandlerRemoteTypeUserOrServer, Appid: HandlerRemoteAppidAll}
 	HandlerRemoteAllUser       = HandlerRemote{Type: HandlerRemoteTypeUser, Appid: HandlerRemoteAppidAll}
 	HandlerRemoteAllServer     = HandlerRemote{Type: HandlerRemoteTypeServer, Appid: HandlerRemoteAppidAll}
 	HandlerRemoteOwnUser       = HandlerRemote{Type: HandlerRemoteTypeUser, Appid: HandlerRemoteAppidOwn}
 	HandlerRemoteOwnServer     = HandlerRemote{Type: HandlerRemoteTypeServer, Appid: HandlerRemoteAppidOwn}
+	HandlerRemoteXcloud        = HandlerRemote{Type: HandlerRemoteTypeXcloud}
 )
 
-// remoteHandler handler depend on remote
+// typedHandler handler depend on remote type
 // own, anonymous, other will be selected first, if not found, then get all
-type remoteHandler struct {
-	own, anonymous Handler
-	other          map[string]Handler
+type typedHandler struct {
+	typ HandlerRemoteType
 
-	all Handler
+	xcloud Handler
+
+	own, anonymous, all Handler
+	apps                map[string]Handler
 }
 
-func newRemoteHandler() *remoteHandler {
-	return &remoteHandler{other: make(map[string]Handler)}
-}
+func newRemoteHandler(remote HandlerRemote, h Handler) *typedHandler {
+	t := &typedHandler{typ: remote.Type, apps: make(map[string]Handler)}
 
-func (s *remoteHandler) addHandler(appid string, h Handler) {
-	switch appid {
+	switch remote.Appid {
 	case HandlerRemoteAppidAnonymous:
-		s.anonymous = h
+		t.anonymous = h
 	case HandlerRemoteAppidOwn:
-		s.own = h
+		t.own = h
 	case HandlerRemoteAppidAll:
-		s.all = h
+		t.all = h
 	default:
-		s.other[appid] = h
+		t.apps[remote.Appid] = h
 	}
+
+	if t.typ&HandlerRemoteTypeXcloud != 0 {
+		t.xcloud = h
+	}
+
+	return t
 }
 
-func (s *remoteHandler) getHandler(svr Server, req *Request) Handler {
-	var h Handler
-	switch req.Appid {
-	case "":
-		h = s.anonymous
-	case svr.GetAddr().AppID:
-		h = s.own
-	default:
-		h = s.other[req.Appid]
+func (t *typedHandler) getHandler(svr Server, typ HandlerRemoteType, appid string) Handler {
+	if typ == HandlerRemoteTypeXcloud {
+		return t.xcloud
 	}
 
+	var h Handler
+	switch appid {
+	case "":
+		h = t.anonymous
+	case svr.GetAddr().AppID:
+		h = t.own
+	default:
+		h = t.apps[appid]
+	}
 	if h != nil {
 		return h
 	}
-	return s.all
+	return t.all
 }
 
 // ServeMux is an XDP request multiplexer.
 type ServeMux struct {
 	mtx sync.RWMutex
 
-	handlers []map[string]*remoteHandler
+	handlers map[string]*list.List //*typedHandler
 }
 
 // NewServeMux create *ServeMux
 func NewServeMux() *ServeMux {
 	sm := new(ServeMux)
-	sm.handlers = make([]map[string]*remoteHandler, HandlerRemoteTypeServer+1)
-	for i := HandlerRemoteTypeBoth; i <= HandlerRemoteTypeServer; i++ {
-		sm.handlers[i] = make(map[string]*remoteHandler)
-	}
+	sm.handlers = make(map[string]*list.List)
 	return sm
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) HandleFunc(remote HandlerRemote, pattern string, h HandlerFunc) {
-	s.Handle(remote, pattern, h)
+func (s *ServeMux) HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
+	s.Handle(remote, api, h)
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) Handle(remote HandlerRemote, pattern string, h Handler) {
-	if remote.Type < HandlerRemoteTypeBoth || remote.Type > HandlerRemoteTypeServer {
+func (s *ServeMux) Handle(remote HandlerRemote, api string, h Handler) {
+	if remote.Type < HandlerRemoteTypeUser || remote.Type > HandlerRemoteTypeAll {
 		panic("invalid remote type")
 	}
 
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-
-	hs := s.handlers[remote.Type]
-	sh, ok := hs[pattern]
+	hs, ok := s.handlers[api]
 	if !ok {
-		sh = newRemoteHandler()
-		hs[pattern] = sh
+		hs = list.New()
+		s.handlers[api] = hs
 	}
-	sh.addHandler(remote.Appid, h)
+	hs.PushBack(newRemoteHandler(remote, h))
 }
 
 func (s *ServeMux) getHandler(svr Server, req *Request) Handler {
-	fn := func(stype HandlerRemoteType) Handler {
-		if sh, ok := s.handlers[stype][req.Api]; ok {
-			return sh.getHandler(svr, req)
-		}
-		return nil
+	var typ HandlerRemoteType
+	if req.Sid != "" {
+		typ = HandlerRemoteTypeUser
+	} else if req.Appid != "" {
+		typ = HandlerRemoteTypeServer
+	} else {
+		typ = HandlerRemoteTypeXcloud
 	}
 
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
+	hs, ok := s.handlers[req.Api]
+	if !ok {
+		return nil
+	}
 
-	stype := HandlerRemoteTypeServer
-	if req.Sid != "" {
-		stype = HandlerRemoteTypeUser
+	for it := hs.Front(); it != nil; it = it.Next() {
+		th := it.Value.(*typedHandler)
+		if h := th.getHandler(svr, typ, req.Appid); h != nil {
+			return h
+		}
 	}
-	if h := fn(stype); h != nil {
-		return h
-	}
-	return fn(HandlerRemoteTypeBoth)
+	return nil
 }
 
 // Serve implement Handler.Serve
@@ -172,10 +191,10 @@ func (s *ServeMux) Serve(svr Server, req *Request) {
 var defaultServeMux = NewServeMux()
 
 // HandleFunc call defaultServeMux.HandleFunc
-func HandleFunc(remote HandlerRemote, pattern string, h HandlerFunc) {
-	defaultServeMux.HandleFunc(remote, pattern, h)
+func HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
+	defaultServeMux.HandleFunc(remote, api, h)
 }
 
-func Handle(remote HandlerRemote, pattern string, h Handler) {
-	defaultServeMux.Handle(remote, pattern, h)
+func Handle(remote HandlerRemote, api string, h Handler) {
+	defaultServeMux.Handle(remote, api, h)
 }

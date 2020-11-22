@@ -18,6 +18,8 @@ var (
 	ErrApiNowAllowed = errors.New("api donot allowed")
 
 	ErrInvalidRemote = errors.New("invalid remote")
+
+	ErrUnprepared = errors.New("server unprepared")
 )
 
 type StatusError struct {

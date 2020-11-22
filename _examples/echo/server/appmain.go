@@ -19,7 +19,7 @@ func appMain() error {
 	svr := server.NewServer(server.WithHandler(sm))
 
 	var gg group.Group
-	gg.Add(func() error { return svr.Serve("appMain:") }, func(error) {})
+	gg.Add(func() error { return svr.Serve("appmain:") }, func(error) {})
 	gg.Add(func() error {
 		t := time.NewTicker(5 * time.Second)
 		for range t.C {

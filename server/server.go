@@ -31,14 +31,6 @@ const (
 	XdpPost = "POST"
 )
 
-type Remote apipb.Remote
-type RemoteSlice []*apipb.Remote
-type Data apipb.Data
-
-func IsValidRemote(remote *Remote) bool {
-	return remote.Sid != "" || remote.Appid != ""
-}
-
 // Address for app address token
 // format is   appid:appsecret
 type Address struct {
@@ -57,16 +49,6 @@ func ParseAddress(addr string) (*Address, error) {
 	}
 
 	return &Address{AppID: sl[0], AppSecret: sl[1]}, nil
-}
-
-type Request struct {
-	*Remote
-
-	*Data
-
-	pid uint32
-
-	reqTime time.Time
 }
 
 type Server interface {
@@ -341,6 +323,9 @@ func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 }
 
 func (x *xdpServer) call(cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
+	if x.conn == nil {
+		return nil, ErrUnprepared
+	}
 	return call(x.conn, cmd, pm)
 }
 
