@@ -20,6 +20,10 @@ make_server() {
     go run ./_examples/echo/server
 }
 
+make_cluster() {
+    cd ./_examples/cluster && go run .
+}
+
 case $1 in
 "api")
     make_api
@@ -32,5 +36,8 @@ case $1 in
     ;;
 "server")
     make_server
+    ;;
+"cluster")
+    make_cluster
     ;;
 esac

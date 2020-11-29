@@ -42,7 +42,21 @@ message MultiMessage {
 }
 
 message HandshakeRequest {
-  string appID = 1;
-  string accessKey = 2;
-  string config = 3;
+  string id = 1;
+  string appid = 2;
+  string accessKey = 3;
+  string config = 4;
 }
+
+message HandshakeResponse { uint32 tempid = 1; }
+
+///////////////////////////////////////////////////////////////////////
+//////////// event notify define //////////////////////////////////////
+
+message EventHandshake {
+  string appid = 1;
+  uint32 tempid = 2;
+}
+
+///////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////

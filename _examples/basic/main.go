@@ -10,9 +10,12 @@ func hello(svr server.Server, req *server.Request) {
 }
 
 func main() {
+	server.SetEnv("debug")
 	server.HandleFunc(server.HandlerRemoteAll, "", hello)
 
-	if err := server.Serve("appid:appkey"); err != nil {
+	if err := server.Serve("appbasic:appkey",
+		server.WithConfig(""),
+	); err != nil {
 		logger.Error("%s", err)
 		return
 	}

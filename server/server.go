@@ -57,7 +57,7 @@ type Server interface {
 	GetAddr() *Address
 
 	// Serve block run server until error or shutdown
-	Serve(addr string) error
+	Serve(addr string, opt ...Option) error
 
 	// Stop()
 
@@ -86,7 +86,7 @@ func SetEnv(env string) {
 	config.SetEnv(env)
 }
 
-func Serve(addr string) error {
+func Serve(addr string, opt ...Option) error {
 	return defaultSvr.Serve(addr)
 }
 
@@ -114,6 +114,8 @@ func ReplyJson(svr Server, req *Request, data interface{}) error {
 // xdpServer for app server
 type xdpServer struct {
 	sync.RWMutex
+
+	Tempid uint32
 
 	opts *Options
 
@@ -149,7 +151,11 @@ func (x *xdpServer) GetAddr() *Address {
 }
 
 // Serve start serve at addr
-func (x *xdpServer) Serve(addr string) error {
+func (x *xdpServer) Serve(addr string, opt ...Option) error {
+	for _, o := range opt {
+		o(x.opts)
+	}
+
 	address, err := ParseAddress(addr)
 	if err != nil {
 		return err
@@ -168,16 +174,25 @@ func (x *xdpServer) Serve(addr string) error {
 	}
 
 	go func() {
-		if _, err = call(conn, apipb.Cmd_CmdHandshake, &apipb.HandshakeRequest{
-			AppID:     x.addr.AppID,
+		data, err := call(conn, apipb.Cmd_CmdHandshake, &apipb.HandshakeRequest{
+			Id:        ap.Id,
+			Appid:     x.addr.AppID,
 			AccessKey: ap.AccessKey,
-		}); err != nil {
+			Config:    x.opts.Config,
+		})
+		if err != nil {
 			conn.Close(err)
 			return
 		}
+		var resp apipb.HandshakeResponse
+		if err := proto.Unmarshal(data, &resp); err != nil {
+			conn.Close(err)
+			return
+		}
+		x.Tempid = resp.Tempid
 		x.conn = conn
 
-		x.opts.Logger.Info("start serve xdp app %s ... ", x.addr.AppID)
+		x.opts.Logger.Info("start serve xdp app %s(%d) ... ", x.addr.AppID, x.Tempid)
 	}()
 	return conn.Recv(x.process)
 }
@@ -287,6 +302,7 @@ func (x *xdpServer) signURL(vals url.Values) {
 
 // AccessPoint xcloud return access_point info
 type AccessPoint struct {
+	Id        string `json:"id"`
 	Addr      string `json:"addr"`
 	AccessKey string `json:"access_key"`
 }
@@ -373,5 +389,11 @@ func (x *xdpServer) processRecv(p *network.Packet) {
 	req.Data = (*Data)(notify.Data)
 	req.reqTime = time.Now()
 	req.pid = p.ID
+	if req.Remote == nil {
+		req.Remote = &Remote{}
+	}
+	if req.Data == nil {
+		req.Data = &Data{}
+	}
 	x.opts.Handler.Serve(x, &req)
 }
