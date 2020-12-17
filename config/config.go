@@ -46,10 +46,10 @@ func SetEnv(env string) {
 
 const (
 	// APIAccessPoint xcloud api accesspoint url
-	APIAccessPoint = "/app/accesspoint"
+	APIAccessPoint = "/app/ap"
 
 	// APIUserGetAccessPoint xcloud client get server tcp addr
-	APIUserGetAccessPoint = "/user/accesspoint"
+	APIUserGetAccessPoint = "/user/ap"
 	APIUserLogin          = "/user/login"
 
 	// APIClientXdpPrefix xcloud client transfer xdp url prefix

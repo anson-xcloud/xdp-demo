@@ -12,6 +12,10 @@ make_api() {
     cd api && protoc --proto_path=. --go_out=,paths=source_relative:. *.proto
 }
 
+make_basic() {
+    go run ./_examples/basic
+}
+
 make_client() {
     go run ./_examples/echo/client
 }
@@ -30,6 +34,9 @@ case $1 in
     ;;
 "build")
     make_build
+    ;;
+"basic")
+    make_basic
     ;;
 "client")
     make_client

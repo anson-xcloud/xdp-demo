@@ -13,7 +13,9 @@ func main() {
 	server.SetEnv("debug")
 	server.HandleFunc(server.HandlerRemoteAll, "", hello)
 
-	if err := server.Serve("appbasic:appkey",
+	addr := "appbasic:appkey"
+	addr = "9410:9410"
+	if err := server.Serve(addr,
 		server.WithConfig(""),
 	); err != nil {
 		logger.Error("%s", err)

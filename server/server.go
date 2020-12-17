@@ -162,6 +162,16 @@ func (x *xdpServer) Serve(addr string, opt ...Option) error {
 	}
 
 	x.addr = address
+
+	for {
+		if err := x.run(); err != nil {
+			x.GetLogger().Error("run error: %s, retry after 10s", err)
+			time.Sleep(time.Second * 10)
+		}
+	}
+}
+
+func (x *xdpServer) run() error {
 	ap, err := x.getAccessPoint()
 	if err != nil {
 		return err
@@ -194,6 +204,7 @@ func (x *xdpServer) Serve(addr string, opt ...Option) error {
 
 		x.opts.Logger.Info("start serve xdp app %s(%d) ... ", x.addr.AppID, x.Tempid)
 	}()
+
 	return conn.Recv(x.process)
 }
 
