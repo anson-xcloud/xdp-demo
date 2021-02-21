@@ -9,35 +9,35 @@ type EnvConfig struct {
 }
 
 const (
-	envDevDiscription     = "dev"
-	envDebugDiscription   = "debug"
-	envReleaseDiscription = "release"
+	EnvDevDiscription     = "dev"
+	EnvDebugDiscription   = "debug"
+	EnvReleaseDiscription = "release"
 )
 
 var (
 	envDev = EnvConfig{
-		Discription: envDevDiscription,
-		XcloudAddr:  "http://127.0.0.1:4021",
+		Discription: EnvDevDiscription,
+		XcloudAddr:  "http://localhost:31181",
 	}
 
 	envDebug = EnvConfig{
-		Discription: envDebugDiscription,
-		XcloudAddr:  "http://127.0.0.1:4021",
+		Discription: EnvDebugDiscription,
+		XcloudAddr:  "http://localhost:31181",
 	}
 
 	envRelease = EnvConfig{
-		Discription: envReleaseDiscription,
+		Discription: EnvReleaseDiscription,
 		XcloudAddr:  "http://xcloud.singularityfuture.com.cn",
 	}
 )
 
 func SetEnv(env string) {
 	switch env {
-	case envDevDiscription:
+	case EnvDevDiscription:
 		Env = &envDev
-	case envDebugDiscription:
+	case EnvDebugDiscription:
 		Env = &envDebug
-	case envReleaseDiscription:
+	case EnvReleaseDiscription:
 		Env = &envRelease
 	default:
 		panic("invalid env")

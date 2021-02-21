@@ -10,11 +10,10 @@ func hello(svr server.Server, req *server.Request) {
 }
 
 func main() {
-	server.SetEnv("debug")
+	server.SetEnv("dev")
 	server.HandleFunc(server.HandlerRemoteAll, "", hello)
 
 	addr := "appbasic:appkey"
-	addr = "9410:9410"
 	if err := server.Serve(addr,
 		server.WithConfig(""),
 	); err != nil {

@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/anson-xcloud/xdp-demo/config"
 	"github.com/anson-xcloud/xdp-demo/pkg/logger"
 	"github.com/anson-xcloud/xdp-demo/pkg/network"
+	"github.com/anson-xcloud/xdp-demo/statuscode"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -84,6 +86,18 @@ type Server interface {
 
 func SetEnv(env string) {
 	config.SetEnv(env)
+}
+
+func SetEnvDebug() {
+	config.SetEnv(config.EnvDebugDiscription)
+}
+
+func SetEnvDev() {
+	config.SetEnv(config.EnvDevDiscription)
+}
+
+func SetEnvRelease() {
+	config.SetEnv(config.EnvReleaseDiscription)
 }
 
 func Serve(addr string, opt ...Option) error {
@@ -184,17 +198,17 @@ func (x *xdpServer) run() error {
 	}
 
 	go func() {
-		data, err := call(conn, apipb.Cmd_CmdHandshake, &apipb.HandshakeRequest{
-			Id:        ap.Id,
-			Appid:     x.addr.AppID,
-			AccessKey: ap.AccessKey,
-			Config:    x.opts.Config,
+		data, err := call(conn, "serivce.register", &apipb.ServiceRegisterRequest{
+			Appid:  x.addr.AppID,
+			Nano:   ap.Nano,
+			Token:  ap.Token,
+			Config: x.opts.Config,
 		})
 		if err != nil {
 			conn.Close(err)
 			return
 		}
-		var resp apipb.HandshakeResponse
+		var resp apipb.ServiceRegisterResponse
 		if err := proto.Unmarshal(data, &resp); err != nil {
 			conn.Close(err)
 			return
@@ -247,7 +261,7 @@ func (x *xdpServer) Send(remote *Remote, data *Data) error {
 	var m apipb.Message
 	m.Remote = pbs
 	m.Data = (*apipb.Data)(data)
-	return x.write(apipb.Cmd_CmdSend, &m)
+	return x.write("xdp.send", &m)
 }
 
 // MultiSend multi send data to session at once
@@ -265,7 +279,7 @@ func (x *xdpServer) MultiSend(remotes RemoteSlice, data *Data) error {
 	var m apipb.MultiMessage
 	m.Remotes = ([]*apipb.Remote)(remotes)
 	m.Data = (*apipb.Data)(data)
-	return x.write(apipb.Cmd_CmdMultiSend, &m)
+	return x.write("xdp.multisend", &m)
 }
 
 func (x *xdpServer) Get(appid string, data *Data) ([]byte, error) {
@@ -277,7 +291,7 @@ func (x *xdpServer) Get(appid string, data *Data) ([]byte, error) {
 	var m apipb.Message
 	m.Remote = pbs
 	m.Data = (*apipb.Data)(data)
-	return x.call(apipb.Cmd_CmdGet, &m)
+	return x.call("xdp.get", &m)
 }
 
 func (x *xdpServer) isApiAllow(api string, remotes ...*apipb.Remote) bool {
@@ -296,10 +310,11 @@ func (x *xdpServer) isApiAllow(api string, remotes ...*apipb.Remote) bool {
 func (x *xdpServer) process(p *network.Packet) {
 	go func() {
 		switch p.Cmd {
-		case uint32(apipb.Cmd_CmdRecv):
-			x.processRecv(p)
+		// case uint32(apipb.Cmd_CmdRecv):
+		// 	x.processRecv(p)
 		default:
-			x.GetLogger().Warn("unknown cmd %d", p.Cmd)
+			x.processRecv(p)
+			// x.GetLogger().Warn("unknown cmd %d", p.Cmd)
 		}
 	}()
 }
@@ -313,14 +328,15 @@ func (x *xdpServer) signURL(vals url.Values) {
 
 // AccessPoint xcloud return access_point info
 type AccessPoint struct {
-	Id        string `json:"id"`
-	Addr      string `json:"addr"`
-	AccessKey string `json:"access_key"`
+	Addr  string `json:"addr"`
+	Nano  int64  `json:"nano"`
+	Token string `json:"token"`
 }
 
 func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	values := make(url.Values)
 	values.Set("appid", x.addr.AppID)
+	values.Set("timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	x.signURL(values)
 	url := fmt.Sprintf("%s%s?%s", config.Env.XcloudAddr, config.APIAccessPoint, values.Encode())
 
@@ -330,58 +346,78 @@ func (x *xdpServer) getAccessPoint() (*AccessPoint, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("http code: %d", resp.StatusCode)
+	}
+
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	type AccessPointResult struct {
-		Status int    `json:"status"`
-		Msg    string `json:"msg"`
+
+	var ret struct {
+		statuscode.Response
 		AccessPoint
 	}
-	var ret AccessPointResult
 	if err := json.Unmarshal(data, &ret); err != nil {
 		return nil, err
 	}
-	if ret.Status != 0 {
-		return nil, fmt.Errorf("response error(%d):%s", ret.Status, ret.Msg)
+	if ret.Code != statuscode.CodeOK {
+		return nil, &ret.Response
 	}
 	return &ret.AccessPoint, nil
 }
 
-func (x *xdpServer) call(cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
+func (x *xdpServer) call(cmd string, pm proto.Message) ([]byte, error) {
 	if x.conn == nil {
 		return nil, ErrUnprepared
 	}
 	return call(x.conn, cmd, pm)
 }
 
-func call(conn *network.Connection, cmd apipb.Cmd, pm proto.Message) ([]byte, error) {
+func call(conn *network.Connection, cmd string, pm proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return nil, err
 	}
 
-	var p network.Packet
-	p.Cmd = uint32(cmd)
+	var p apipb.Packet
+	p.Cmd = cmd
+	// p.Version=1
 	p.Data = bs
-	rp, err := conn.Call(context.Background(), &p)
+	bs, err = proto.Marshal(&p)
+	if err != nil {
+		return nil, err
+	}
+
+	var np network.Packet
+	// p.Cmd = uint32(cmd)
+	np.Data = bs
+	rp, err := conn.Call(context.Background(), &np)
 	if err != nil {
 		return nil, err
 	}
 	return rp.Data, nil
 }
 
-func (x *xdpServer) write(cmd apipb.Cmd, pm proto.Message) error {
+func (x *xdpServer) write(cmd string, pm proto.Message) error {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return err
 	}
 
-	var p network.Packet
-	p.Cmd = uint32(apipb.Cmd_CmdSend)
+	var p apipb.Packet
+	p.Cmd = cmd
+	// p.Version=1
 	p.Data = bs
-	return x.writePacket(&p)
+	bs, err = proto.Marshal(&p)
+	if err != nil {
+		return err
+	}
+
+	var np network.Packet
+	np.Data = bs
+	return x.writePacket(&np)
 }
 
 func (x *xdpServer) writePacket(p *network.Packet) error {

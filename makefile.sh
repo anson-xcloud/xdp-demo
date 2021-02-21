@@ -1,50 +1,14 @@
 #!/bin/bash
 
-make_build() {
-    go build ./client
-    go build ./server
-    go build -o build/_examples/basic ./_examples/basic
-    go build -o build/_examples/echo_client ./_examples/echo/client
-    go build -o build/_examples/echo_server ./_examples/echo/server
-}
+if [ $# -eq 0 ]; then
+    echo "must have command"
+    exit 1
+fi
 
-make_api() {
-    cd api && protoc --proto_path=. --go_out=,paths=source_relative:. *.proto
-}
-
-make_basic() {
-    go run ./_examples/basic
-}
-
-make_client() {
-    go run ./_examples/echo/client
-}
-
-make_server() {
-    go run ./_examples/echo/server
-}
-
-make_cluster() {
-    cd ./_examples/cluster && go run .
-}
-
-case $1 in
-"api")
-    make_api
-    ;;
-"build")
-    make_build
-    ;;
-"basic")
-    make_basic
-    ;;
-"client")
-    make_client
-    ;;
-"server")
-    make_server
-    ;;
-"cluster")
-    make_cluster
-    ;;
-esac
+cmd=./scripts/makefiles/$1.sh
+if [ -f $cmd ]; then
+    sh $cmd
+else
+    echo "unsupport command $1"
+    exit 2
+fi

@@ -4,15 +4,10 @@ package apipb;
 
 option go_package = "github.com/anson-xcloud/xdp-demo/api";
 
-enum Cmd {
-  CmdNone = 0;
-
-  CmdHandshake = 1;
-
-  CmdRecv = 11;
-  CmdSend = 20;
-  CmdMultiSend = 21;
-  CmdGet = 22;
+message Packet {
+  string cmd = 1;
+  string version = 2;
+  bytes data = 3;
 }
 
 message Remote {
@@ -23,6 +18,7 @@ message Remote {
   string openid = 3;
   string network = 4;
   string addr = 5;
+  bool authorized = 6;
 }
 
 message Data {
@@ -41,21 +37,29 @@ message MultiMessage {
   Data data = 2;
 }
 
-message HandshakeRequest {
-  string id = 1;
-  string appid = 2;
-  string accessKey = 3;
+message ServiceRegisterRequest {
+  string appid = 1;
+  int64 nano = 2;
+  string token = 3;
   string config = 4;
 }
 
-message HandshakeResponse { uint32 tempid = 1; }
+message ServiceRegisterResponse {
+  string id = 1;
+  uint32 tempid = 2;
+}
 
 ///////////////////////////////////////////////////////////////////////
 //////////// event notify define //////////////////////////////////////
 
-message EventHandshake {
-  string appid = 1;
-  uint32 tempid = 2;
+message EventServiceDiscovery {
+  message Service {
+    string id = 1;
+    uint32 tempid = 2;
+    repeated string tags = 3;
+    int32 op = 4;
+  }
+  repeated Service svc = 1;
 }
 
 ///////////////////////////////////////////////////////////////////////
