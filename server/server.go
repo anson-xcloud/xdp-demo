@@ -101,7 +101,7 @@ func SetEnvRelease() {
 }
 
 func Serve(addr string, opt ...Option) error {
-	return defaultSvr.Serve(addr)
+	return defaultSvr.Serve(addr, opt...)
 }
 
 func Send(appid, api string, data []byte) {
@@ -129,7 +129,8 @@ func ReplyJson(svr Server, req *Request, data interface{}) error {
 type xdpServer struct {
 	sync.RWMutex
 
-	Tempid uint32
+	ID  string
+	Rid int
 
 	opts *Options
 
@@ -151,6 +152,7 @@ func NewServer(opt ...Option) Server {
 
 	xs := new(xdpServer)
 	xs.opts = &opts
+	xs.Rid = opts.Rid
 	return xs
 }
 
@@ -178,7 +180,11 @@ func (x *xdpServer) Serve(addr string, opt ...Option) error {
 	x.addr = address
 
 	for {
-		if err := x.run(); err != nil {
+		if err = x.run(); err != nil {
+			if x.opts.OnceTry {
+				return err
+			}
+
 			x.GetLogger().Error("run error: %s, retry after 10s", err)
 			time.Sleep(time.Second * 10)
 		}
@@ -190,6 +196,7 @@ func (x *xdpServer) run() error {
 	if err != nil {
 		return err
 	}
+	x.ID = ap.ID
 
 	conn := network.NewConnection()
 	conn.Logger = x.opts.Logger
@@ -199,8 +206,8 @@ func (x *xdpServer) run() error {
 
 	go func() {
 		data, err := call(conn, "serivce.register", &apipb.ServiceRegisterRequest{
-			Appid:  x.addr.AppID,
-			Nano:   ap.Nano,
+			Id:     ap.ID,
+			Rid:    int32(x.Rid),
 			Token:  ap.Token,
 			Config: x.opts.Config,
 		})
@@ -213,10 +220,10 @@ func (x *xdpServer) run() error {
 			conn.Close(err)
 			return
 		}
-		x.Tempid = resp.Tempid
+		x.Rid = int(resp.Rid)
 		x.conn = conn
 
-		x.opts.Logger.Info("start serve xdp app %s(%d) ... ", x.addr.AppID, x.Tempid)
+		x.opts.Logger.Info("start serve xdp app %s(%d) ... ", x.addr.AppID, x.Rid)
 	}()
 
 	return conn.Recv(x.process)
@@ -328,8 +335,8 @@ func (x *xdpServer) signURL(vals url.Values) {
 
 // AccessPoint xcloud return access_point info
 type AccessPoint struct {
+	ID    string `json:"id"`
 	Addr  string `json:"addr"`
-	Nano  int64  `json:"nano"`
 	Token string `json:"token"`
 }
 
@@ -385,14 +392,14 @@ func call(conn *network.Connection, cmd string, pm proto.Message) ([]byte, error
 	p.Cmd = cmd
 	// p.Version=1
 	p.Data = bs
-	bs, err = proto.Marshal(&p)
+	pbs, err := proto.Marshal(&p)
 	if err != nil {
 		return nil, err
 	}
 
 	var np network.Packet
 	// p.Cmd = uint32(cmd)
-	np.Data = bs
+	np.Data = pbs
 	rp, err := conn.Call(context.Background(), &np)
 	if err != nil {
 		return nil, err

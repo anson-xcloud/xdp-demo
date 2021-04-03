@@ -12,12 +12,16 @@ type Option func(*Options)
 
 // Options server all options
 type Options struct {
+	Rid int
+
 	Handler Handler
 
 	Logger logger.Logger
 
 	// Config xcloud config
 	Config string
+
+	OnceTry bool
 }
 
 var defaultOptions = Options{
@@ -33,6 +37,12 @@ func WithHandler(h Handler) Option {
 	}
 }
 
+func WithRid(rid int) Option {
+	return func(opts *Options) {
+		opts.Rid = rid
+	}
+}
+
 // WithLogger set logger
 // if dont set, default use *fmtLogger
 func WithLogger(l logger.Logger) Option {
@@ -45,6 +55,12 @@ func WithLogger(l logger.Logger) Option {
 func WithConfig(cfg string) Option {
 	return func(opts *Options) {
 		opts.Config = cfg
+	}
+}
+
+func WithOnceTry(once bool) Option {
+	return func(opts *Options) {
+		opts.OnceTry = once
 	}
 }
 

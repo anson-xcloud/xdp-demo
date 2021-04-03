@@ -14,6 +14,16 @@
             "args": []
         },
         {
+            "name": "LaunchBasic",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceRoot}/_examples/basic",
+            "cwd": "${workspaceRoot}/_examples/basic",
+            "env": {},
+            "args": []
+        },
+        {
             "name": "LaunchEchoServer",
             "type": "go",
             "request": "launch",

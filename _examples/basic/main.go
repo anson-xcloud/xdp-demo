@@ -16,6 +16,8 @@ func main() {
 	addr := "appbasic:appkey"
 	if err := server.Serve(addr,
 		server.WithConfig(""),
+		server.WithOnceTry(true),
+		// server.WithUID("1"),
 	); err != nil {
 		logger.Error("%s", err)
 		return
