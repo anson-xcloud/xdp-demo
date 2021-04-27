@@ -7,7 +7,7 @@ fi
 
 cmd=./scripts/makefiles/$1.sh
 if [ -f $cmd ]; then
-    sh $cmd
+    sh $cmd ${@:2}
 else
     echo "unsupport command $1"
     exit 2
