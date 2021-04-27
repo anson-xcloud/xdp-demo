@@ -2,7 +2,8 @@ package local
 
 import (
 	"sync"
-	"xcloud/pkg/clientapi/joinpoint"
+
+	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 )
 
 var (

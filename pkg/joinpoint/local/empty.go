@@ -3,7 +3,8 @@ package local
 import (
 	"context"
 	"errors"
-	"xcloud/pkg/clientapi/joinpoint"
+
+	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 )
 
 type Provider struct {
