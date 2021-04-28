@@ -13,7 +13,7 @@ type Terminal struct {
 
 	Opts *Options
 
-	connect func(context.Context, string) (Point, []string, error)
+	connect func(context.Context, string) (Transport, []string, error)
 }
 
 func Join(ctx context.Context, c *Config, opt ...Option) error {
@@ -29,7 +29,7 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 	var t Terminal
 	t.Provider = c.Provider
 	t.Opts = &opts
-	t.connect = func(ctx context.Context, addr string) (Point, []string, error) {
+	t.connect = func(ctx context.Context, addr string) (Transport, []string, error) {
 		var cctx = ctx
 		if opts.MaxConnectTime != 0 {
 			var cancel context.CancelFunc
@@ -42,7 +42,7 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 }
 
 func (t *Terminal) JoinWithRetry(ctx context.Context, addr string) error {
-	var p Point
+	var p Transport
 	var addrs []string
 	var err error
 	var nextRetry, maxNextRetry = time.Second, time.Second * 30
@@ -116,7 +116,7 @@ func (r *responseWriter) WriteStatus(st *Status) {
 	}
 }
 
-func (t *Terminal) read(ctx context.Context, p Point, worker Worker) error {
+func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 	for {
 		req, err := p.Recv(ctx)
 		if err != nil {

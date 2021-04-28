@@ -20,21 +20,21 @@ func (p *Provider) Request(req *Request) error {
 	return <-req.ch
 }
 
-func (p *Provider) Connect(ctx context.Context, addr string) (joinpoint.Point, []string, error) {
-	return &Point{source: p.source}, nil, nil
+func (p *Provider) Connect(ctx context.Context, addr string) (joinpoint.Transport, []string, error) {
+	return &Transport{source: p.source}, nil, nil
 }
 
 func (p *Provider) Serve(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
 	rw.WriteStatus(joinpoint.StatusOK)
 }
 
-type Point struct {
+type Transport struct {
 	source chan joinpoint.Request
 }
 
-func (p *Point) Recv(ctx context.Context) (joinpoint.Request, error) {
+func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 	select {
-	case req, ok := <-p.source:
+	case req, ok := <-t.source:
 		if !ok {
 			return nil, errors.New("source close")
 		}

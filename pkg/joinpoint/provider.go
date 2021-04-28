@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type Point interface {
+type Transport interface {
 	Recv(ctx context.Context) (Request, error)
 }
 
@@ -19,7 +19,7 @@ type ResponseWriter interface {
 }
 
 type Provider interface {
-	Connect(ctx context.Context, addr string) (Point, []string, error)
+	Connect(ctx context.Context, addr string) (Transport, []string, error)
 
 	Serve(context.Context, ResponseWriter, Request)
 }
