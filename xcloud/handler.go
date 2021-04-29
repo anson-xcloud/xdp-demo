@@ -2,7 +2,7 @@ package xcloud
 
 import (
 	"container/list"
-	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -10,6 +10,8 @@ import (
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/network"
 )
+
+var defaultServeMux = NewServeMux()
 
 type Remote apipb.Remote
 type RemoteSlice []*apipb.Remote
@@ -30,10 +32,12 @@ type Request struct {
 
 	t *Transport
 
-	rw joinpoint.ResponseWriter
-
 	// TODO
 	selfAppid string
+}
+
+func (r *Request) Discription() string {
+	return fmt.Sprintf("%s", r.Api)
 }
 
 func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
@@ -43,14 +47,6 @@ func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
 func (r *Request) GetHeader(key string) string {
 	v := r.Data.Headers[key]
 	return v
-}
-
-func (x *Request) Write(data interface{}) {
-	x.rw.Write(data)
-}
-
-func (x *Request) WriteStatus(st *joinpoint.Status) {
-	x.rw.WriteStatus(st)
 }
 
 type ResponseWriter struct {
@@ -82,19 +78,6 @@ func (x *ResponseWriter) WriteStatus(st *joinpoint.Status) {
 	p.Ec = uint32(st.GetCode())
 	// p.EcMsg = st.Message
 	x.t.writePacket(&p)
-}
-
-type Handler interface {
-	Serve(context.Context, *Request)
-
-	// ServeConnect()
-	// ServeClose()
-}
-
-type HandlerFunc func(context.Context, *Request)
-
-func (h HandlerFunc) Serve(ctx context.Context, req *Request) {
-	h(ctx, req)
 }
 
 type HandlerRemoteType int
@@ -141,14 +124,14 @@ var (
 type typedHandler struct {
 	typ HandlerRemoteType
 
-	xcloud Handler
+	xcloud joinpoint.Handler
 
-	own, anonymous, all Handler
-	apps                map[string]Handler
+	own, anonymous, all joinpoint.Handler
+	apps                map[string]joinpoint.Handler
 }
 
-func newRemoteHandler(remote HandlerRemote, h Handler) *typedHandler {
-	t := &typedHandler{typ: remote.Type, apps: make(map[string]Handler)}
+func newRemoteHandler(remote HandlerRemote, h joinpoint.Handler) *typedHandler {
+	t := &typedHandler{typ: remote.Type, apps: make(map[string]joinpoint.Handler)}
 
 	switch remote.Appid {
 	case HandlerRemoteAppidAnonymous:
@@ -168,12 +151,12 @@ func newRemoteHandler(remote HandlerRemote, h Handler) *typedHandler {
 	return t
 }
 
-func (t *typedHandler) getHandler(typ HandlerRemoteType, req *Request) Handler {
+func (t *typedHandler) getHandler(typ HandlerRemoteType, req *Request) joinpoint.Handler {
 	if typ == HandlerRemoteTypeXcloud {
 		return t.xcloud
 	}
 
-	var h Handler
+	var h joinpoint.Handler
 	switch req.Appid {
 	case "":
 		h = t.anonymous
@@ -203,12 +186,12 @@ func NewServeMux() *ServeMux {
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
+func (s *ServeMux) HandleFunc(remote HandlerRemote, api string, h joinpoint.HandlerFunc) {
 	s.Handle(remote, api, h)
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) Handle(remote HandlerRemote, api string, h Handler) {
+func (s *ServeMux) Handle(remote HandlerRemote, api string, h joinpoint.Handler) {
 	if remote.Type < HandlerRemoteTypeUser || remote.Type > HandlerRemoteTypeAll {
 		panic("invalid remote type")
 	}
@@ -223,7 +206,7 @@ func (s *ServeMux) Handle(remote HandlerRemote, api string, h Handler) {
 	hs.PushBack(newRemoteHandler(remote, h))
 }
 
-func (s *ServeMux) getHandler(req *Request) Handler {
+func (s *ServeMux) Get(req *Request) joinpoint.Handler {
 	var typ HandlerRemoteType
 	if req.Sid != "" {
 		typ = HandlerRemoteTypeUser
@@ -249,31 +232,11 @@ func (s *ServeMux) getHandler(req *Request) Handler {
 	return nil
 }
 
-// Serve implement Handler.Serve
-func (s *ServeMux) Serve(ctx context.Context, req *Request) {
-	var ec int
-	defer func() {
-		// ts := time.Since(req.reqTime).Seconds()
-		// svr.GetLogger().Debug("[XDP] %s serve %s cost %.3fs, ec(%d)", svr.GetAddr().AppID, req.Api, ts, ec)
-	}()
-
-	h := s.getHandler(req)
-	if h == nil {
-		ec = 100
-		// req.ReplyError(req, ec, "")
-		req.WriteStatus(joinpoint.NewStatus(ec, ""))
-		return
-	}
-	h.Serve(ctx, req)
-}
-
-var defaultServeMux = NewServeMux()
-
 // HandleFunc call defaultServeMux.HandleFunc
-func HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
+func HandleFunc(remote HandlerRemote, api string, h joinpoint.HandlerFunc) {
 	defaultServeMux.HandleFunc(remote, api, h)
 }
 
-func Handle(remote HandlerRemote, api string, h Handler) {
+func Handle(remote HandlerRemote, api string, h joinpoint.Handler) {
 	defaultServeMux.Handle(remote, api, h)
 }

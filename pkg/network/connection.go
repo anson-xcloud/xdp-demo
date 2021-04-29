@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/anson-xcloud/xdp-demo/pkg/logger"
+	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 )
 
 type caller struct {
@@ -24,7 +24,7 @@ func newCaller() *caller {
 
 // Connection tcp connection
 type Connection struct {
-	logger.Logger
+	xlog.Logger
 
 	mtx sync.Mutex
 
@@ -78,7 +78,7 @@ func (c *Connection) Recv(handler func(p *Packet)) error {
 				continue
 			}
 
-			c.Error("read %s packet error:%s", nc.RemoteAddr(), err)
+			c.Errorf("read %s packet error:%s", nc.RemoteAddr(), err)
 			return err
 		}
 
@@ -90,7 +90,7 @@ func (c *Connection) Recv(handler func(p *Packet)) error {
 		c.mtx.Lock()
 		if ctx, ok := c.callers[p.ID]; !ok {
 			c.mtx.Unlock()
-			c.Error("%s unexisted rpc return %d", nc.RemoteAddr(), p.ID)
+			c.Errorf("%s unexisted rpc return %d", nc.RemoteAddr(), p.ID)
 		} else {
 			delete(c.callers, p.ID)
 			c.mtx.Unlock()

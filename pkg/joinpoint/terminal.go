@@ -124,6 +124,11 @@ func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 		}
 
 		worker.Run(func() {
+			st := time.Now()
+			defer func() {
+				xlog.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.Discription(), time.Since(st).Seconds())
+			}()
+
 			var rw responseWriter
 			rw.rw = req.GetResponseWriter()
 			if t.Opts.MaxHandlerTime != 0 {

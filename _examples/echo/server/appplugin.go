@@ -1,34 +1,41 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/server"
+	"github.com/anson-xcloud/xdp-demo/xcloud"
 )
 
 const appidPlugin = "appplugin"
 
 func appPlugin() error {
-	sm := server.NewServeMux()
-	sm.HandleFunc(server.HandlerRemoteAllUser, "", echo)
-	sm.HandleFunc(server.HandlerRemoteAllServer, "", echoServer)
+	c := xcloud.DefaultConfig()
+	c.Handler = xcloud.NewServeMux()
+	c.Handler.HandleFunc(xcloud.HandlerRemoteAllUser, "", echo)
+	c.Handler.HandleFunc(xcloud.HandlerRemoteAllServer, "", echoServer)
+	xc := xcloud.New(c)
 
-	svr := server.NewServer(server.WithHandler(sm))
-	return svr.Serve(appidPlugin + ":key1")
+	return joinpoint.Join(context.Background(), &joinpoint.Config{
+		Addr:     ":key1",
+		Provider: xc,
+	})
 }
 
-func echo(svr server.Server, req *server.Request) {
-	echo := fmt.Sprintf("%s too, guys", req.Data.Data)
-	svr.Reply(req, []byte(echo))
-	notify(svr, req)
+func echo(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
+	echo := fmt.Sprintf("%s too, guys", jr.Data.Data)
+	rw.Write([]byte(echo))
+	notify(svr, jr)
 }
 
-func echoServer(svr server.Server, req *server.Request) {
-	echo := fmt.Sprintf("%s too, bots", req.Data.Data)
-	svr.Reply(req, []byte(echo))
+func echoServer(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
+	echo := fmt.Sprintf("%s too, bots", jr.Data.Data)
+	rw.Write([]byte(echo))
 }
 
-func notify(svr server.Server, req *server.Request) {
+func notify(rw joinpoint.ResponseWriter, jr joinpoint.Request) {
 	if req.Appid == appidPlugin {
 		return
 	}

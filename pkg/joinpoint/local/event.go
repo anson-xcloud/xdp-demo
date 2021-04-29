@@ -1,6 +1,7 @@
 package local
 
 import (
+	"strconv"
 	"sync"
 
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
@@ -26,18 +27,22 @@ func NewEvent() *Request {
 	return &Request{ID: id, ch: make(chan error)}
 }
 
-func (e *Request) GetResponseWriter() joinpoint.ResponseWriter {
-	return &ResponseWriter{ev: e}
+func (r *Request) Discription() string {
+	return strconv.FormatInt(int64(r.ID), 10)
+}
+
+func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
+	return &ResponseWriter{ev: r}
 }
 
 type ResponseWriter struct {
 	ev *Request
 }
 
-func (p *ResponseWriter) Write(interface{}) {
-	p.ev.ch <- nil
+func (r *ResponseWriter) Write(interface{}) {
+	r.ev.ch <- nil
 }
 
-func (p *ResponseWriter) WriteStatus(st *joinpoint.Status) {
-	p.ev.ch <- st
+func (r *ResponseWriter) WriteStatus(st *joinpoint.Status) {
+	r.ev.ch <- st
 }

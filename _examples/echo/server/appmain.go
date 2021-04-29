@@ -1,42 +1,47 @@
 package main
 
 import (
+	"context"
 	"time"
 
-	"github.com/anson-xcloud/xdp-demo/server"
-	"github.com/oklog/oklog/pkg/group"
+	apipb "github.com/anson-xcloud/xdp-demo/api"
+	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
+	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
+	"github.com/anson-xcloud/xdp-demo/xcloud"
 )
 
 var count int
 
 // appMain has install plugin support by appPlugin
 func appMain() error {
-	appPluginServer := server.HandlerRemote{Type: server.HandlerRemoteTypeServer, Appid: appidPlugin}
+	appPluginServer := xcloud.HandlerRemote{Type: xcloud.HandlerRemoteTypeServer, Appid: appidPlugin}
 
-	sm := server.NewServeMux()
-	sm.HandleFunc(appPluginServer, "", onApp1Echo)
+	c := xcloud.DefaultConfig()
+	c.Handler = xcloud.NewServeMux()
+	c.Handler.HandleFunc(appPluginServer, "", onApp1Echo)
+	xc := xcloud.New(c)
 
-	svr := server.NewServer(server.WithHandler(sm))
+	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
+		Addr:     "appmain:",
+		Provider: xc,
+	}); err != nil {
+		return err
+	}
 
-	var gg group.Group
-	gg.Add(func() error { return svr.Serve("appmain:") }, func(error) {})
-	gg.Add(func() error {
-		t := time.NewTicker(5 * time.Second)
-		for range t.C {
-			st := time.Now()
-			if bdata, err := svr.Get(appidPlugin, &server.Data{Data: []byte("hello")}); err != nil {
-				svr.GetLogger().Error("hello to plugin err:%s", err)
-			} else {
-				sec := time.Since(st).Seconds()
-				svr.GetLogger().Info("hello plugin cost %.3f, msg: %s", sec, bdata)
-			}
+	t := time.NewTicker(5 * time.Second)
+	for range t.C {
+		st := time.Now()
+		if bdata, err := xc.Get(appidPlugin, &apipb.Data{Data: []byte("hello")}); err != nil {
+			xlog.Errorf("hello to plugin err:%s", err)
+		} else {
+			sec := time.Since(st).Seconds()
+			xlog.Infof("hello plugin cost %.3f, msg: %s", sec, bdata)
 		}
-		return nil
-	}, func(error) {})
-	return gg.Run()
+	}
+	return nil
 }
 
-func onApp1Echo(svr server.Server, req *server.Request) {
+func onApp1Echo(ctx context.Context, rw joinpoint.ResponseWriter, req joinpoint.Request) {
 	count++
-	svr.GetLogger().Debug("user total echo count: %d", count)
+	xlog.Debugf("user total echo count: %d", count)
 }

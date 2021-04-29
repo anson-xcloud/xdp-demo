@@ -33,19 +33,22 @@ type Config struct {
 	Env EnvConfig
 
 	Logger xlog.Logger
+
+	Handler *ServeMux
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		Env:    Env(EnvReleaseDiscription),
-		Logger: xlog.Default,
+		Env:     EnvDefault,
+		Logger:  xlog.Default,
+		Handler: defaultServeMux,
 	}
 }
 
 type EnvConfig struct {
 	Discription string
 
-	XcloudAddr string
+	XcloudAddrs []string
 }
 
 const (
@@ -54,22 +57,29 @@ const (
 	EnvReleaseDiscription = "release"
 )
 
-var enves = map[string]EnvConfig{
-	EnvDevDiscription: {
-		Discription: EnvDevDiscription,
-		XcloudAddr:  "http://localhost:31181",
-	},
-	EnvDebugDiscription: {
-		Discription: EnvDebugDiscription,
-		XcloudAddr:  "http://localhost:31181",
-	},
-	EnvReleaseDiscription: {
-		Discription: EnvReleaseDiscription,
-		XcloudAddr:  "http://xcloud.singularityfuture.com.cn",
-	},
-}
+var (
+	enves = map[string]EnvConfig{
+		EnvDevDiscription: {
+			Discription: EnvDevDiscription,
+			XcloudAddrs: []string{"http://localhost:31181"},
+		},
+		EnvDebugDiscription: {
+			Discription: EnvDebugDiscription,
+			XcloudAddrs: []string{"http://localhost:31181"},
+		},
+		EnvReleaseDiscription: {
+			Discription: EnvReleaseDiscription,
+			XcloudAddrs: []string{"http://xcloud.singularityfuture.com.cn"},
+		},
+	}
 
-func Env(env string) EnvConfig {
+	EnvDev     = getEnv(EnvDevDiscription)
+	EnvDebug   = getEnv(EnvDebugDiscription)
+	EnvRelease = getEnv(EnvReleaseDiscription)
+	EnvDefault = EnvRelease
+)
+
+func getEnv(env string) EnvConfig {
 	c, ok := enves[env]
 	// debug.PanicIf(ok, "")
 	if !ok {
@@ -77,4 +87,8 @@ func Env(env string) EnvConfig {
 	}
 
 	return c
+}
+
+func SetEnv(env string) {
+	EnvDefault = getEnv(env)
 }

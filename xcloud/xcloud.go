@@ -1,10 +1,12 @@
 package xcloud
 
 import (
+	"container/list"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -20,23 +22,39 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type XCloud struct {
-	Rid int // runtime id
+var Default *XCloud
 
-	env EnvConfig
+func init() {
+	Default, _ = New(DefaultConfig())
+}
+
+type XCloud struct {
+	serverAddrs *list.List
 
 	logger xlog.Logger
 
 	sm *ServeMux
+
+	transport *Transport
+
+	Rid int // runtime id
 }
 
-func New(c *Config) *XCloud {
-	xc := &XCloud{logger: c.Logger}
+func New(c *Config) (*XCloud, error) {
+	if len(c.Env.XcloudAddrs) == 0 {
+		return nil, errors.New("no server support")
+	}
 
-	xc.env = c.Env
-	xc.sm = defaultServeMux
+	addrs := list.New()
+	for _, addr := range c.Env.XcloudAddrs {
+		addrs.PushBack(addr)
+	}
 
-	return xc
+	return &XCloud{
+		serverAddrs: addrs,
+		logger:      c.Logger,
+		sm:          c.Handler,
+	}, nil
 }
 
 func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport, []string, error) {
@@ -49,15 +67,15 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 	if err != nil {
 		return nil, nil, err
 	}
-	// x.ID = ap.ID
 
 	conn := network.NewConnection()
-	// conn.Logger = x.opts.Logger
+	conn.Logger = x.logger
 	if err := conn.Connect(ap.Addr); err != nil {
 		return nil, nil, err
 	}
 
-	data, err := call(conn, "serivce.register", &apipb.ServiceRegisterRequest{
+	transport := &Transport{conn: conn}
+	data, err := transport.call("serivce.register", &apipb.ServiceRegisterRequest{
 		Id:    ap.ID,
 		Rid:   int32(x.Rid),
 		Token: ap.Token,
@@ -74,19 +92,25 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 		return nil, nil, err
 	}
 	x.Rid = int(resp.Rid)
-	// x.conn = conn
-	return &Transport{conn: conn}, nil, nil
-	// x.opts.Logger.Info("start serve xdp app %s(%d) ... ", x.addr.AppID, x.Rid)
-
-	// return conn.Recv(x.process)
+	x.transport = transport
+	return x.transport, nil, nil
 }
 
 func (x *XCloud) Serve(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
 	req := jr.(*Request)
 
-	req.rw = rw
-	x.sm.Serve(ctx, req)
-	// x.opts.Handler.Serve(x, &req)
+	h := x.sm.Get(req)
+	if h == nil {
+		rw.WriteStatus(joinpoint.NewStatus(100, ""))
+		return
+	}
+	h.Serve(ctx, rw, req)
+}
+
+func (x *XCloud) Get(ctx context.Context, appid string, data *apipb.Data) ([]byte, error) {
+	return x.transport.call("xdp.get", &apipb.ServiceRegisterRequest{
+		// Config: x.opts.Config,
+	})
 }
 
 type Transport struct {
@@ -125,7 +149,7 @@ func (t *Transport) writePacket(packet *network.Packet) error {
 	return t.conn.Write(packet)
 }
 
-func call(conn *network.Connection, cmd string, pm proto.Message) ([]byte, error) {
+func (t *Transport) call(cmd string, pm proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return nil, err
@@ -143,7 +167,7 @@ func call(conn *network.Connection, cmd string, pm proto.Message) ([]byte, error
 	var np network.Packet
 	// p.Cmd = uint32(cmd)
 	np.Data = pbs
-	rp, err := conn.Call(context.Background(), &np)
+	rp, err := t.conn.Call(context.Background(), &np)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +193,11 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 	values.Set("appid", addr.AppID)
 	values.Set("timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	signURL(addr.AppSecret, values)
-	url := fmt.Sprintf("%s%s?%s", x.env.XcloudAddr, APIAccessPoint, values.Encode())
+
+	it := x.serverAddrs.Front()
+	x.serverAddrs.Remove(it)
+	x.serverAddrs.PushBack(it.Value)
+	url := fmt.Sprintf("%s%s?%s", it.Value, APIAccessPoint, values.Encode())
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -178,7 +206,7 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("getAccessPoint errcode %d", resp.StatusCode)
 	}
 
 	data, err := ioutil.ReadAll(resp.Body)
