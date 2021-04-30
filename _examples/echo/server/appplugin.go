@@ -5,40 +5,48 @@ import (
 	"fmt"
 
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
-	"github.com/anson-xcloud/xdp-demo/server"
+	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 	"github.com/anson-xcloud/xdp-demo/xcloud"
 )
 
 const appidPlugin = "appplugin"
 
+var xcPlugin *xcloud.XCloud
+
 func appPlugin() error {
 	c := xcloud.DefaultConfig()
 	c.Handler = xcloud.NewServeMux()
-	c.Handler.HandleFunc(xcloud.HandlerRemoteAllUser, "", echo)
-	c.Handler.HandleFunc(xcloud.HandlerRemoteAllServer, "", echoServer)
-	xc := xcloud.New(c)
+	c.Logger = xlog.Default.With("app", "plugin")
+	c.Handler.HandleFunc(xcloud.HandlerRemoteAllUser, "echo", echo)
+	c.Handler.HandleFunc(xcloud.HandlerRemoteAllServer, "echo", echoServer)
+	xcPlugin, _ = xcloud.New(c)
 
 	return joinpoint.Join(context.Background(), &joinpoint.Config{
-		Addr:     ":key1",
-		Provider: xc,
+		Addr:     "appplugin:",
+		Provider: xcPlugin,
+		Logger:   c.Logger,
 	})
 }
 
 func echo(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
-	echo := fmt.Sprintf("%s too, guys", jr.Data.Data)
+	req := jr.(*xcloud.Request)
+
+	echo := fmt.Sprintf("%s too, guys", req.Data.Data)
 	rw.Write([]byte(echo))
-	notify(svr, jr)
+	notify(ctx, req)
 }
 
 func echoServer(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
-	echo := fmt.Sprintf("%s too, bots", jr.Data.Data)
+	req := jr.(*xcloud.Request)
+
+	echo := fmt.Sprintf("%s too, bots", req.Data.Data)
 	rw.Write([]byte(echo))
 }
 
-func notify(rw joinpoint.ResponseWriter, jr joinpoint.Request) {
+func notify(ctx context.Context, req *xcloud.Request) {
 	if req.Appid == appidPlugin {
 		return
 	}
 
-	svr.Send(&server.Remote{Appid: req.Appid}, &server.Data{Api: ""})
+	xcPlugin.Post(ctx, &xcloud.Remote{Appid: req.Appid}, &xcloud.Data{Api: ""})
 }

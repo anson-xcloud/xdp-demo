@@ -225,6 +225,9 @@ func (s *ServeMux) Get(req *Request) joinpoint.Handler {
 
 	for it := hs.Front(); it != nil; it = it.Next() {
 		th := it.Value.(*typedHandler)
+		if th.typ != typ {
+			continue
+		}
 		if h := th.getHandler(typ, req); h != nil {
 			return h
 		}

@@ -26,12 +26,14 @@ func main() {
 	xcloud.SetEnv("dev")
 	xcloud.HandleFunc(xcloud.HandlerRemoteAll, "", hello)
 
-	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*24)
+	defer cancel()
+	if err := joinpoint.Join(ctx, &joinpoint.Config{
 		Addr:     "appbasic:appkey",
-		Provider: xcloud.Default,
+		Provider: xcloud.Default(),
 	}); err != nil {
 		return
 	}
 
-	time.Sleep(time.Hour * 24)
+	<-ctx.Done()
 }

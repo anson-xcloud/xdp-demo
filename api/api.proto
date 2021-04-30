@@ -27,6 +27,10 @@ message Data {
   bytes data = 3;
 }
 
+message RawData {
+  bytes data = 3;
+}
+
 message Message {
   Remote remote = 1;
   Data data = 2;
@@ -51,27 +55,35 @@ message ServiceRegisterResponse {
 enum ServiceStatus{
   ServiceStatusNone = 0;
   ServiceStatusRunning = 1;
-  ServiceStatusIdle = 2;
+  ServiceStatusSuspend = 2;
 }
 
-message ServiceStatusRequest {
+message ServiceSuspendRequest {
   string id = 1;
   uint32 status = 2;
 }
 
+message ServiceResumeRequest {
+  string id = 1;
+  uint32 status = 2;
+}
 
+message ServiceStateRequest {
+  string id = 1;
+  uint32 status = 2;
+}
 ///////////////////////////////////////////////////////////////////////
 //////////// event notify define //////////////////////////////////////
 
-message EventServiceDiscovery {
-  message Service {
-    string id = 1;
-    uint32 tempid = 2;
-    repeated string tags = 3;
-    int32 op = 4;
-  }
-  repeated Service svc = 1;
-}
+// message EventServiceDiscovery {
+//   message Service {
+//     string id = 1;
+//     uint32 tempid = 2;
+//     repeated string tags = 3;
+//     int32 op = 4;
+//   }
+//   repeated Service svc = 1;
+// }
 
 ///////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////

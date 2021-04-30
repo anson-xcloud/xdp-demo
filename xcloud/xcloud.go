@@ -22,12 +22,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var Default *XCloud
-
-func init() {
-	Default, _ = New(DefaultConfig())
-}
-
 type XCloud struct {
 	serverAddrs *list.List
 
@@ -38,6 +32,11 @@ type XCloud struct {
 	transport *Transport
 
 	Rid int // runtime id
+}
+
+func Default() *XCloud {
+	xc, _ := New(DefaultConfig())
+	return xc
 }
 
 func New(c *Config) (*XCloud, error) {
@@ -75,7 +74,7 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 	}
 
 	transport := &Transport{conn: conn}
-	data, err := transport.call("serivce.register", &apipb.ServiceRegisterRequest{
+	data, err := transport.call(ctx, "serivce.register", &apipb.ServiceRegisterRequest{
 		Id:    ap.ID,
 		Rid:   int32(x.Rid),
 		Token: ap.Token,
@@ -107,12 +106,6 @@ func (x *XCloud) Serve(ctx context.Context, rw joinpoint.ResponseWriter, jr join
 	h.Serve(ctx, rw, req)
 }
 
-func (x *XCloud) Get(ctx context.Context, appid string, data *apipb.Data) ([]byte, error) {
-	return x.transport.call("xdp.get", &apipb.ServiceRegisterRequest{
-		// Config: x.opts.Config,
-	})
-}
-
 type Transport struct {
 	conn *network.Connection
 }
@@ -121,6 +114,8 @@ func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 	var p *network.Packet
 	select {
 	case p = <-t.conn.Recv2():
+	case err := <-t.conn.Error():
+		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -149,7 +144,7 @@ func (t *Transport) writePacket(packet *network.Packet) error {
 	return t.conn.Write(packet)
 }
 
-func (t *Transport) call(cmd string, pm proto.Message) ([]byte, error) {
+func pack(cmd string, pm proto.Message) (*network.Packet, error) {
 	bs, err := proto.Marshal(pm)
 	if err != nil {
 		return nil, err
@@ -167,11 +162,34 @@ func (t *Transport) call(cmd string, pm proto.Message) ([]byte, error) {
 	var np network.Packet
 	// p.Cmd = uint32(cmd)
 	np.Data = pbs
-	rp, err := t.conn.Call(context.Background(), &np)
+	return &np, nil
+}
+
+func (t *Transport) call(ctx context.Context, cmd string, pm proto.Message) ([]byte, error) {
+	np, err := pack(cmd, pm)
 	if err != nil {
 		return nil, err
 	}
-	return rp.Data, nil
+
+	rp, err := t.conn.Call(ctx, np)
+	if err != nil {
+		return nil, err
+	}
+
+	var rd apipb.RawData
+	if err := proto.Unmarshal(rp.Data, &rd); err != nil {
+		return nil, err
+	}
+	return rd.Data, nil
+}
+
+func (t *Transport) write(ctx context.Context, cmd string, pm proto.Message) error {
+	np, err := pack(cmd, pm)
+	if err != nil {
+		return err
+	}
+
+	return t.writePacket(np)
 }
 
 func signURL(sec string, vals url.Values) {
@@ -225,4 +243,51 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 		return nil, &ret.Response
 	}
 	return &ret.AccessPoint, nil
+}
+
+func (x *XCloud) Post(ctx context.Context, remote *Remote, data *Data) error {
+	if !IsValidRemote(remote) {
+		return ErrInvalidRemote
+	}
+
+	pbs := (*apipb.Remote)(remote)
+	// if !x.isApiAllow(data.Api, pbs) {
+	// 	return ErrApiNowAllowed
+	// }
+
+	return x.transport.write(ctx, "xdp.post", &apipb.Message{
+		Remote: pbs,
+		Data:   (*apipb.Data)(data),
+	})
+}
+
+// MultiPost multi send data to session at once
+func (x *XCloud) MultiPost(ctx context.Context, remotes RemoteSlice, data *Data) error {
+	for _, remote := range remotes {
+		if !IsValidRemote((*Remote)(remote)) {
+			return ErrInvalidRemote
+		}
+	}
+
+	// if !x.isApiAllow(data.Api, remotes...) {
+	// 	return ErrApiNowAllowed
+	// }
+
+	return x.transport.write(ctx, "xdp.multipost", &apipb.MultiMessage{
+		Remotes: ([]*apipb.Remote)(remotes),
+		Data:    (*apipb.Data)(data),
+	})
+}
+
+func (x *XCloud) Get(ctx context.Context, appid string, data *apipb.Data) ([]byte, error) {
+	remote := &apipb.Remote{Appid: appid}
+	// if !x.isApiAllow(data.Api, pbs) {
+	// 	return nil, ErrApiNowAllowed
+	// }
+
+	return x.transport.call(ctx, "xdp.get", &apipb.Message{
+		Remote: remote,
+		Data:   data,
+		// Config: x.opts.Config,
+	})
 }

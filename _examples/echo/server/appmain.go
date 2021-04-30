@@ -11,19 +11,23 @@ import (
 )
 
 var count int
+var xcMainLogger xlog.Logger
 
 // appMain has install plugin support by appPlugin
 func appMain() error {
 	appPluginServer := xcloud.HandlerRemote{Type: xcloud.HandlerRemoteTypeServer, Appid: appidPlugin}
+	xcMainLogger = xlog.Default.With("app", "main")
 
 	c := xcloud.DefaultConfig()
+	c.Logger = xcMainLogger
 	c.Handler = xcloud.NewServeMux()
 	c.Handler.HandleFunc(appPluginServer, "", onApp1Echo)
-	xc := xcloud.New(c)
+	xc, _ := xcloud.New(c)
 
 	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
 		Addr:     "appmain:",
 		Provider: xc,
+		Logger:   xcMainLogger,
 	}); err != nil {
 		return err
 	}
@@ -31,11 +35,11 @@ func appMain() error {
 	t := time.NewTicker(5 * time.Second)
 	for range t.C {
 		st := time.Now()
-		if bdata, err := xc.Get(appidPlugin, &apipb.Data{Data: []byte("hello")}); err != nil {
-			xlog.Errorf("hello to plugin err:%s", err)
+		if bdata, err := xc.Get(context.Background(), appidPlugin, &apipb.Data{Api: "echo", Data: []byte("hello")}); err != nil {
+			xcMainLogger.Errorf("hello to plugin err:%s", err)
 		} else {
 			sec := time.Since(st).Seconds()
-			xlog.Infof("hello plugin cost %.3f, msg: %s", sec, bdata)
+			xcMainLogger.Infof("hello plugin cost %.3f, msg: %s", sec, bdata)
 		}
 	}
 	return nil
@@ -43,5 +47,5 @@ func appMain() error {
 
 func onApp1Echo(ctx context.Context, rw joinpoint.ResponseWriter, req joinpoint.Request) {
 	count++
-	xlog.Debugf("user total echo count: %d", count)
+	xcMainLogger.Debugf("user total echo count: %d", count)
 }

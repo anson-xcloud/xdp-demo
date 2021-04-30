@@ -34,6 +34,7 @@ type Connection struct {
 	cec error //close error
 
 	recved chan *Packet
+	err    chan error
 
 	rpcid   uint32
 	callers map[uint32]*caller
@@ -43,6 +44,7 @@ func NewConnection() *Connection {
 	conn := new(Connection)
 	conn.recved = make(chan *Packet, 1024)
 	conn.callers = make(map[uint32]*caller)
+	conn.err = make(chan error)
 	return conn
 }
 
@@ -55,9 +57,11 @@ func (c *Connection) Connect(addr string) error {
 	}
 
 	c.nc = nc
-	go c.Recv(func(p *Packet) {
-		c.recved <- p
-	})
+	go func() {
+		if err := c.Recv(func(p *Packet) { c.recved <- p }); err != nil {
+			c.err <- err
+		}
+	}()
 	return nil
 }
 
@@ -67,6 +71,10 @@ func (c *Connection) Read() *Packet {
 
 func (c *Connection) Recv2() <-chan *Packet {
 	return c.recved
+}
+
+func (c *Connection) Error() <-chan error {
+	return c.err
 }
 
 func (c *Connection) Recv(handler func(p *Packet)) error {

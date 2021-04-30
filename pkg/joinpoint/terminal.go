@@ -9,6 +9,8 @@ import (
 )
 
 type Terminal struct {
+	logger xlog.Logger
+
 	Provider Provider
 
 	Opts *Options
@@ -27,6 +29,7 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 	}
 
 	var t Terminal
+	t.logger = c.Logger
 	t.Provider = c.Provider
 	t.Opts = &opts
 	t.connect = func(ctx context.Context, addr string) (Transport, []string, error) {
@@ -54,7 +57,7 @@ func (t *Terminal) JoinWithRetry(ctx context.Context, addr string) error {
 		if nextRetry = nextRetry * 2; nextRetry > maxNextRetry {
 			nextRetry = maxNextRetry
 		}
-		xlog.Warnf("terminal connect %s fail, wait for retry. error: %s", addr, err)
+		t.logger.Warnf("terminal connect %s fail, wait for retry. error: %s", addr, err)
 
 		select {
 		case <-time.After(nextRetry):
@@ -126,7 +129,7 @@ func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 		worker.Run(func() {
 			st := time.Now()
 			defer func() {
-				xlog.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.Discription(), time.Since(st).Seconds())
+				t.logger.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.Discription(), time.Since(st).Seconds())
 			}()
 
 			var rw responseWriter
