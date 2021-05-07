@@ -25,10 +25,9 @@ func appMain() error {
 	xc, _ := xcloud.New(c)
 
 	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
-		Addr:     "appmain:",
-		Provider: xc,
-		Logger:   xcMainLogger,
-	}); err != nil {
+		ServerAddr: "appmain:",
+		Provider:   xc,
+	}, joinpoint.WithLogger(xcMainLogger)); err != nil {
 		return err
 	}
 

@@ -1,22 +1,17 @@
 package joinpoint
 
 import (
-	"xcloud/pkg/xflag"
-
-	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
+	"github.com/anson-xcloud/xdp-demo/pkg/xflag"
 )
 
 type Config struct {
 	ServerAddr string
 
 	Provider Provider
-
-	Logger xlog.Logger
 }
 
 func DefaultConfig() *Config {
 	c := &Config{}
-	c.Logger = xlog.Default
 	return c
 }
 

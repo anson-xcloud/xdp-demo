@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/anson-xcloud/xdp-demo/config"
-	"github.com/anson-xcloud/xdp-demo/pkg/logger"
+	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 )
 
 var defaultClient Client
@@ -22,8 +22,8 @@ func BuildRequest() *Request {
 	return &Request{Headers: make(map[string]string)}
 }
 
-func GetLogger() logger.Logger {
-	return logger.Default
+func GetLogger() xlog.Logger {
+	return xlog.Default
 }
 
 func SetEnv(env string) {

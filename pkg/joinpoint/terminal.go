@@ -29,7 +29,7 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 	}
 
 	var t Terminal
-	t.logger = c.Logger
+	t.logger = opts.logger
 	t.Provider = c.Provider
 	t.Opts = &opts
 	t.connect = func(ctx context.Context, addr string) (Transport, []string, error) {
@@ -66,9 +66,11 @@ func (t *Terminal) JoinWithRetry(ctx context.Context, addr string) error {
 		}
 	}
 
+	t.logger.Debugf("[JOINPOINT] terminal connect success")
+
 	go func() {
 		eg, egCtx := errgroup.WithContext(ctx)
-		eg.Go(func() error { return t.read(egCtx, p, t.Opts.Worker) })
+		eg.Go(func() error { return t.read(egCtx, p, t.Opts.worker) })
 		if err := eg.Wait(); err == nil {
 			return
 		}

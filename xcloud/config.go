@@ -61,11 +61,11 @@ var (
 	enves = map[string]EnvConfig{
 		EnvDevDiscription: {
 			Discription: EnvDevDiscription,
-			XcloudAddrs: []string{"http://localhost:31181"},
+			XcloudAddrs: []string{"http://localhost:4021"},
 		},
 		EnvDebugDiscription: {
 			Discription: EnvDebugDiscription,
-			XcloudAddrs: []string{"http://localhost:31181"},
+			XcloudAddrs: []string{"http://localhost:4021"},
 		},
 		EnvReleaseDiscription: {
 			Discription: EnvReleaseDiscription,

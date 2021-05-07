@@ -22,10 +22,9 @@ func appPlugin() error {
 	xcPlugin, _ = xcloud.New(c)
 
 	return joinpoint.Join(context.Background(), &joinpoint.Config{
-		Addr:     "appplugin:",
-		Provider: xcPlugin,
-		Logger:   c.Logger,
-	})
+		ServerAddr: "appplugin:",
+		Provider:   xcPlugin,
+	}, joinpoint.WithLogger(c.Logger))
 }
 
 func echo(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
@@ -44,7 +43,7 @@ func echoServer(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.R
 }
 
 func notify(ctx context.Context, req *xcloud.Request) {
-	if req.Appid == appidPlugin {
+	if req.Appid == "" || req.Appid == appidPlugin {
 		return
 	}
 

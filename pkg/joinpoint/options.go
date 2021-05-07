@@ -1,17 +1,30 @@
 package joinpoint
 
-import "time"
+import (
+	"time"
+
+	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
+)
 
 type Option func(*Options)
 
 type Options struct {
-	Worker Worker
+	worker Worker
 
 	MaxConnectTime time.Duration
 
 	MaxHandlerTime time.Duration
+
+	logger xlog.Logger
 }
 
 var defaultOptions = Options{
-	Worker: NewGoWorker(),
+	worker: NewGoWorker(),
+	logger: xlog.Default,
+}
+
+func WithLogger(logger xlog.Logger) Option {
+	return func(opts *Options) {
+		opts.logger = logger
+	}
 }
