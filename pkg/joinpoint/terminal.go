@@ -41,7 +41,7 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 		}
 		return c.Provider.Connect(cctx, addr)
 	}
-	return t.JoinWithRetry(ctx, c.Addr)
+	return t.JoinWithRetry(ctx, c.ServerAddr)
 }
 
 func (t *Terminal) JoinWithRetry(ctx context.Context, addr string) error {
