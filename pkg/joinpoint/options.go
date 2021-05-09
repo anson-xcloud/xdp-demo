@@ -19,7 +19,9 @@ type Options struct {
 }
 
 var defaultOptions = Options{
-	worker: NewGoWorker(),
+	worker: NewGoWorker(func(v interface{}) {
+		xlog.Errorf("%v", v)
+	}),
 	logger: xlog.Default,
 }
 

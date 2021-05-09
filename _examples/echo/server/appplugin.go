@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/anson-xcloud/xdp-demo/api"
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 	"github.com/anson-xcloud/xdp-demo/xcloud"
@@ -27,25 +28,21 @@ func appPlugin() error {
 	}, joinpoint.WithLogger(c.Logger))
 }
 
-func echo(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
-	req := jr.(*xcloud.Request)
-
-	echo := fmt.Sprintf("%s too, guys", req.Data.Data)
-	rw.Write([]byte(echo))
+func echo(ctx context.Context, req *xcloud.Request) {
+	echo := fmt.Sprintf("%s too, guys", req.GetBody())
+	req.Response([]byte(echo))
 	notify(ctx, req)
 }
 
-func echoServer(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
-	req := jr.(*xcloud.Request)
-
-	echo := fmt.Sprintf("%s too, bots", req.Data.Data)
-	rw.Write([]byte(echo))
+func echoServer(ctx context.Context, req *xcloud.Request) {
+	echo := fmt.Sprintf("%s too, bots", req.GetBody())
+	req.Response([]byte(echo))
 }
 
 func notify(ctx context.Context, req *xcloud.Request) {
-	if req.Appid == "" || req.Appid == appidPlugin {
-		return
-	}
+	// if req.Source.Appid == "appmain" {
+	// 	return
+	// }
 
-	xcPlugin.Post(ctx, &xcloud.Remote{Appid: req.Appid}, &xcloud.Data{Api: ""})
+	xcPlugin.Post(ctx, &api.Peer{Appid: "appmain"}, "on_user_echo", nil, nil)
 }

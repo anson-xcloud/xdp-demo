@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"time"
 
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
@@ -14,16 +15,23 @@ type Response struct {
 	Message string    `json:"message"`
 }
 
-func hello(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
+func JSON(req *xcloud.Request, obj interface{}) {
+	data, _ := json.Marshal(obj)
+	req.Response(data)
+}
+
+func hello(ctx context.Context, req *xcloud.Request) {
 	var resp Response
 	resp.Time = time.Now()
 	resp.Message = "hello world"
-	data, _ := json.Marshal(&resp)
-	rw.Write(data)
+	JSON(req, &resp)
 }
 
 func main() {
-	xcloud.SetEnv("dev")
+	env := flag.String("env", "release", "xcloud env")
+	flag.Parse()
+
+	xcloud.SetEnv(*env)
 	xcloud.HandleFunc(xcloud.HandlerRemoteAll, "", hello)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*24)

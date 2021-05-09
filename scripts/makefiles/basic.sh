@@ -1,3 +1,3 @@
 #!/bin/bash
 
-go run ./_examples/basic
+go run ./_examples/basic --env=dev

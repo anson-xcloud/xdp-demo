@@ -21,7 +21,10 @@
             "program": "${workspaceRoot}/_examples/basic",
             "cwd": "${workspaceRoot}/_examples/basic",
             "env": {},
-            "args": []
+            "args": [
+                "--env",
+                "dev"
+            ]
         },
         {
             "name": "LaunchEchoServer",

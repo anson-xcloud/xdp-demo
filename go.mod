@@ -3,6 +3,7 @@ module github.com/anson-xcloud/xdp-demo
 go 1.16
 
 require (
+	github.com/golang/protobuf v1.5.0
 	github.com/oklog/run v1.1.0
 	github.com/spf13/pflag v1.0.5
 	go.uber.org/zap v1.16.0

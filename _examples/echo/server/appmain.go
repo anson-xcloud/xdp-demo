@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	apipb "github.com/anson-xcloud/xdp-demo/api"
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 	"github.com/anson-xcloud/xdp-demo/xcloud"
@@ -21,7 +20,7 @@ func appMain() error {
 	c := xcloud.DefaultConfig()
 	c.Logger = xcMainLogger
 	c.Handler = xcloud.NewServeMux()
-	c.Handler.HandleFunc(appPluginServer, "", onApp1Echo)
+	c.Handler.HandleFunc(appPluginServer, "on_user_echo", onPluginUserEcho)
 	xc, _ := xcloud.New(c)
 
 	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
@@ -34,7 +33,7 @@ func appMain() error {
 	t := time.NewTicker(5 * time.Second)
 	for range t.C {
 		st := time.Now()
-		if bdata, err := xc.Get(context.Background(), appidPlugin, &apipb.Data{Api: "echo", Data: []byte("hello")}); err != nil {
+		if bdata, err := xc.Get(context.Background(), appidPlugin, "echo", nil, []byte("hello")); err != nil {
 			xcMainLogger.Errorf("hello to plugin err:%s", err)
 		} else {
 			sec := time.Since(st).Seconds()
@@ -44,7 +43,7 @@ func appMain() error {
 	return nil
 }
 
-func onApp1Echo(ctx context.Context, rw joinpoint.ResponseWriter, req joinpoint.Request) {
+func onPluginUserEcho(ctx context.Context, req *xcloud.Request) {
 	count++
 	xcMainLogger.Debugf("user total echo count: %d", count)
 }

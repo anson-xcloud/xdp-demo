@@ -86,41 +86,6 @@ func (t *Terminal) JoinWithRetry(ctx context.Context, addr string) error {
 	return err
 }
 
-type responseWriter struct {
-	rw ResponseWriter
-
-	cancel context.CancelFunc
-}
-
-func (r *responseWriter) WithTimeout(ctx context.Context, du time.Duration) context.Context {
-	ctx, cancel := context.WithTimeout(ctx, du)
-	go func() {
-		<-ctx.Done()
-		cancel()
-	}()
-
-	r.cancel = cancel
-	return ctx
-}
-
-func (r *responseWriter) Write(data interface{}) {
-	if r.rw != nil {
-		r.rw.Write(data)
-	}
-	if r.cancel != nil {
-		r.cancel()
-	}
-}
-
-func (r *responseWriter) WriteStatus(st *Status) {
-	if r.rw != nil {
-		r.rw.WriteStatus(st)
-	}
-	if r.cancel != nil {
-		r.cancel()
-	}
-}
-
 func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 	for {
 		req, err := p.Recv(ctx)
@@ -134,12 +99,13 @@ func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 				t.logger.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.Discription(), time.Since(st).Seconds())
 			}()
 
-			var rw responseWriter
-			rw.rw = req.GetResponseWriter()
+			rw := req.GetResponseWriter()
 			if t.Opts.MaxHandlerTime != 0 {
-				ctx = rw.WithTimeout(ctx, t.Opts.MaxHandlerTime)
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, t.Opts.MaxHandlerTime)
+				defer cancel()
 			}
-			t.Provider.Serve(ctx, &rw, req)
+			t.Provider.Serve(ctx, rw, req)
 		})
 	}
 }

@@ -2,6 +2,7 @@ package xcloud
 
 import (
 	"container/list"
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -9,28 +10,21 @@ import (
 	apipb "github.com/anson-xcloud/xdp-demo/api"
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/network"
+	"google.golang.org/protobuf/proto"
 )
 
 var defaultServeMux = NewServeMux()
 
-type Remote apipb.Remote
-type RemoteSlice []*apipb.Remote
-type Data apipb.Data
-
-func IsValidRemote(remote *Remote) bool {
-	return remote.Sid != "" || remote.Appid != ""
-}
-
 type Request struct {
-	*Remote
-
-	*Data
+	*apipb.Request
 
 	pid uint32
 
 	reqTime time.Time
 
 	t *Transport
+
+	rw joinpoint.ResponseWriter
 
 	// TODO
 	selfAppid string
@@ -45,42 +39,64 @@ func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
 }
 
 func (r *Request) GetHeader(key string) string {
-	v := r.Data.Headers[key]
+	v := r.Headers[key]
 	return v
+}
+
+func (r *Request) Response(data interface{}) {
+	r.rw.Write(data)
+}
+
+func (r *Request) ResponseStatus(st *joinpoint.Status) {
+	r.rw.WriteStatus(st)
 }
 
 type ResponseWriter struct {
 	*Request
 }
 
-func (x *ResponseWriter) Write(data interface{}) {
-	if x.pid == 0 {
+func (r *ResponseWriter) Write(data interface{}) {
+	if r.pid == 0 {
 		return
 	}
 
-	// TODO
+	var req apipb.Response
+	req.Body = data.([]byte)
+	body, err := proto.Marshal(&req)
+	if err != nil {
+		// TODO writestatus
+		return
+	}
 
 	var p network.Packet
-	p.ID = x.pid
+	p.ID = r.pid
 	p.Flag |= network.FlagRPCResponse
-	p.Data = data.([]byte)
-	x.t.writePacket(&p)
+	p.Data = body
+	r.t.writePacket(&p)
 }
 
-func (x *ResponseWriter) WriteStatus(st *joinpoint.Status) {
-	if x.pid == 0 {
+func (r *ResponseWriter) WriteStatus(st *joinpoint.Status) {
+	if r.pid == 0 {
 		return
 	}
 
 	var p network.Packet
-	p.ID = x.pid
+	p.ID = r.pid
 	p.Flag |= network.FlagRPCResponse
 	p.Ec = uint32(st.GetCode())
 	// p.EcMsg = st.Message
-	x.t.writePacket(&p)
+	r.t.writePacket(&p)
 }
 
 type HandlerRemoteType int
+type Handler interface {
+	Serve(context.Context, *Request)
+}
+type HandlerFunc func(context.Context, *Request)
+
+func (h HandlerFunc) Serve(ctx context.Context, req *Request) {
+	h(ctx, req)
+}
 
 // HandlerRemote handle remote condition
 // note: Anonymous donot have HandlerRemoteTypeServer
@@ -124,14 +140,14 @@ var (
 type typedHandler struct {
 	typ HandlerRemoteType
 
-	xcloud joinpoint.Handler
+	xcloud Handler
 
-	own, anonymous, all joinpoint.Handler
-	apps                map[string]joinpoint.Handler
+	own, anonymous, all Handler
+	apps                map[string]Handler
 }
 
-func newRemoteHandler(remote HandlerRemote, h joinpoint.Handler) *typedHandler {
-	t := &typedHandler{typ: remote.Type, apps: make(map[string]joinpoint.Handler)}
+func newRemoteHandler(remote HandlerRemote, h Handler) *typedHandler {
+	t := &typedHandler{typ: remote.Type, apps: make(map[string]Handler)}
 
 	switch remote.Appid {
 	case HandlerRemoteAppidAnonymous:
@@ -151,19 +167,19 @@ func newRemoteHandler(remote HandlerRemote, h joinpoint.Handler) *typedHandler {
 	return t
 }
 
-func (t *typedHandler) getHandler(typ HandlerRemoteType, req *Request) joinpoint.Handler {
+func (t *typedHandler) getHandler(typ HandlerRemoteType, req *Request) Handler {
 	if typ == HandlerRemoteTypeXcloud {
 		return t.xcloud
 	}
 
-	var h joinpoint.Handler
-	switch req.Appid {
+	var h Handler
+	switch req.Source.Appid {
 	case "":
 		h = t.anonymous
 	case req.selfAppid:
 		h = t.own
 	default:
-		h = t.apps[req.Appid]
+		h = t.apps[req.Source.Appid]
 	}
 	if h != nil {
 		return h
@@ -186,12 +202,12 @@ func NewServeMux() *ServeMux {
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) HandleFunc(remote HandlerRemote, api string, h joinpoint.HandlerFunc) {
+func (s *ServeMux) HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
 	s.Handle(remote, api, h)
 }
 
 // HandleFunc register handler func
-func (s *ServeMux) Handle(remote HandlerRemote, api string, h joinpoint.Handler) {
+func (s *ServeMux) Handle(remote HandlerRemote, api string, h Handler) {
 	if remote.Type < HandlerRemoteTypeUser || remote.Type > HandlerRemoteTypeAll {
 		panic("invalid remote type")
 	}
@@ -206,11 +222,11 @@ func (s *ServeMux) Handle(remote HandlerRemote, api string, h joinpoint.Handler)
 	hs.PushBack(newRemoteHandler(remote, h))
 }
 
-func (s *ServeMux) Get(req *Request) joinpoint.Handler {
+func (s *ServeMux) Get(req *Request) Handler {
 	var typ HandlerRemoteType
-	if req.Sid != "" {
+	if req.Source.Sid != "" {
 		typ = HandlerRemoteTypeUser
-	} else if req.Appid != "" {
+	} else if req.Source.Appid != "" {
 		typ = HandlerRemoteTypeServer
 	} else {
 		typ = HandlerRemoteTypeXcloud
@@ -236,10 +252,10 @@ func (s *ServeMux) Get(req *Request) joinpoint.Handler {
 }
 
 // HandleFunc call defaultServeMux.HandleFunc
-func HandleFunc(remote HandlerRemote, api string, h joinpoint.HandlerFunc) {
+func HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
 	defaultServeMux.HandleFunc(remote, api, h)
 }
 
-func Handle(remote HandlerRemote, api string, h joinpoint.Handler) {
+func Handle(remote HandlerRemote, api string, h Handler) {
 	defaultServeMux.Handle(remote, api, h)
 }

@@ -4,12 +4,34 @@ type Worker interface {
 	Run(f func())
 }
 
-type goWorker struct{}
-
-func (g *goWorker) Run(f func()) {
-	go f()
+type goWorker struct {
+	recover func(interface{})
 }
 
-func NewGoWorker() Worker {
-	return &goWorker{}
+func (g *goWorker) Run(f func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if g.recover != nil {
+					g.recover(r)
+				}
+			}
+		}()
+
+		f()
+	}()
+}
+
+func NewGoWorker(recover func(interface{})) Worker {
+	return &goWorker{recover: recover}
+}
+
+type syncWorker struct{}
+
+func (w *syncWorker) Run(f func()) {
+	f()
+}
+
+func NewSyncWorker() Worker {
+	return &syncWorker{}
 }

@@ -29,9 +29,3 @@ type Provider interface {
 
 	Connect(ctx context.Context, addr string) (Transport, []string, error)
 }
-
-type HandlerFunc func(context.Context, ResponseWriter, Request)
-
-func (h HandlerFunc) Serve(ctx context.Context, rw ResponseWriter, req Request) {
-	h(ctx, rw, req)
-}
