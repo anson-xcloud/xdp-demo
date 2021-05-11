@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrUnreachable  = errors.New("")
-	ErrProviderNeed = errors.New("provider need")
-	ErrDone         = errors.New("done")
+	ErrUnreachable    = errors.New("")
+	ErrProviderNeed   = errors.New("provider need")
+	ErrDone           = errors.New("done")
+	ErrNoneServerAddr = errors.New("no server addr")
 )
 
 var (
