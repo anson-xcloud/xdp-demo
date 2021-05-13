@@ -13,13 +13,15 @@ var (
 )
 
 var (
-	CodeOK         = 0
-	CodeUnkown     = 1
-	CodeMaxReserve = 100
+	CodeOK              = 0
+	CodeUnkown          = 1
+	CodeUnauthenticated = 2
+	CodeMaxReserve      = 100
 )
 
 var (
-	StatusOK = NewStatus(CodeOK, "ok")
+	StatusOK              = NewStatus(CodeOK, "ok")
+	StatusUnauthenticated = NewStatus(CodeUnauthenticated, "Unauthenticated")
 )
 
 type Status struct {
@@ -44,6 +46,14 @@ func FromError(err error) *Status {
 		return NewStatus(s.GetCode(), s.GetMessage())
 	}
 	return NewStatus(CodeUnkown, err.Error())
+}
+
+func IsStatus(err error, code int) bool {
+	st := FromError(err)
+	if st == nil {
+		return false
+	}
+	return st.Code == code
 }
 
 // New returns a Status representing c and msg.

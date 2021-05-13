@@ -23,7 +23,7 @@ func appMain() error {
 	c.Handler.HandleFunc(appPluginServer, "on_user_echo", onPluginUserEcho)
 	xc, _ := xcloud.New(c)
 
-	if err := joinpoint.Join(context.Background(), &joinpoint.Config{
+	if _, err := joinpoint.Join(context.Background(), &joinpoint.Config{
 		ServerAddr: "appmain:",
 		Provider:   xc,
 	}, joinpoint.WithLogger(xcMainLogger)); err != nil {

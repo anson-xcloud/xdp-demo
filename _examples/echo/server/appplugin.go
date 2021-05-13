@@ -22,10 +22,11 @@ func appPlugin() error {
 	c.Handler.HandleFunc(xcloud.HandlerRemoteAllServer, "echo", echoServer)
 	xcPlugin, _ = xcloud.New(c)
 
-	return joinpoint.Join(context.Background(), &joinpoint.Config{
+	_, err := joinpoint.Join(context.Background(), &joinpoint.Config{
 		ServerAddr: "appplugin:",
 		Provider:   xcPlugin,
 	}, joinpoint.WithLogger(c.Logger))
+	return err
 }
 
 func echo(ctx context.Context, req *xcloud.Request) {

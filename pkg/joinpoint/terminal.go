@@ -11,6 +11,9 @@ import (
 type Terminal struct {
 	logger xlog.Logger
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	Provider Provider
 
 	Opts *Options
@@ -18,9 +21,9 @@ type Terminal struct {
 	connect func(context.Context, string) (Transport, []string, error)
 }
 
-func Join(ctx context.Context, c *Config, opt ...Option) error {
+func Join(ctx context.Context, c *Config, opt ...Option) (*Terminal, error) {
 	if c.Provider == nil {
-		return ErrProviderNeed
+		return nil, ErrProviderNeed
 	}
 
 	var opts = defaultOptions
@@ -41,58 +44,70 @@ func Join(ctx context.Context, c *Config, opt ...Option) error {
 		}
 		return c.Provider.Connect(cctx, addr)
 	}
-	return t.JoinWithRetry(ctx, []string{c.ServerAddr})
+	t.ctx, t.cancel = context.WithCancel(ctx)
+
+	go t.joinWithRetry(t.ctx, []string{c.ServerAddr}, 0)
+	return &t, nil
 }
 
-func (t *Terminal) JoinWithRetry(ctx context.Context, addrs []string) error {
+const maxNextRetry = time.Second * 30
+
+func (t *Terminal) Context() context.Context {
+	return t.ctx
+}
+
+func (t *Terminal) joinWithRetry(ctx context.Context, addrs []string, nextRetry time.Duration) {
 	if len(addrs) == 0 {
-		return ErrNoneServerAddr
+		return
 	}
 
-	var addr string
-	var nextRetry, maxNextRetry = time.Second, time.Second * 30
+	fnNextRetry := func(nr time.Duration) time.Duration {
+		if nr = nr*2 + time.Second; nr > maxNextRetry {
+			nr = maxNextRetry
+		}
+		return nr
+	}
+
 	for i := 0; ; i = (i + 1) % len(addrs) {
-		addr = addrs[i]
+		select {
+		case <-time.After(nextRetry):
+		case <-ctx.Done():
+			t.cancel()
+			return
+		}
+
+		addr := addrs[i]
 		p, backups, err := t.connect(ctx, addr)
 		if err != nil {
-			if nextRetry = nextRetry * 2; nextRetry > maxNextRetry {
-				nextRetry = maxNextRetry
-			}
+			nextRetry = fnNextRetry(nextRetry)
 			t.logger.Warnf("[JOINPOINT] terminal wait for retry, connect %s error: %s", addr, err)
-
-			select {
-			case <-time.After(nextRetry):
-			case <-ctx.Done():
-				return ErrDone
-			}
 			continue
 		}
 
 		t.logger.Debugf("[JOINPOINT] terminal connect %s success", addr)
-
 		go func() {
 			start := time.Now()
 
 			eg, egCtx := errgroup.WithContext(ctx)
 			eg.Go(func() error { return t.read(egCtx, p, t.Opts.worker) })
 			if err := eg.Wait(); err != nil {
-				t.logger.Warnf("[JOINPOINT] terminal wait for retry, read %s error: %s", addr, err)
+				if IsStatus(err, CodeUnauthenticated) {
+					t.logger.Errorf("[JOINPOINT] terminal stopped, read %s error: %s", addr, err)
+					t.cancel()
+					return
+				}
 
-				if nextRetry = nextRetry - time.Since(start); nextRetry > 0 {
-					select {
-					case <-time.After(nextRetry):
-					case <-ctx.Done():
-						return
-					}
+				t.logger.Warnf("[JOINPOINT] terminal wait for retry, read %s error: %s", addr, err)
+				nextRetry = fnNextRetry(nextRetry)
+				if nextRetry = nextRetry - time.Since(start); nextRetry < 0 {
+					nextRetry = 0
 				}
 				addrs = []string{addr}
 				addrs = append(addrs, backups...)
-				if err := t.JoinWithRetry(ctx, addrs); err != nil {
-					t.logger.Warnf("[JOINPOINT] terminal join error: %s", err)
-				}
+				t.joinWithRetry(ctx, addrs, nextRetry)
 			}
 		}()
-		return nil
+		break
 	}
 }
 

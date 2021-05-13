@@ -36,12 +36,13 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*24)
 	defer cancel()
-	if err := joinpoint.Join(ctx, &joinpoint.Config{
+	terminal, err := joinpoint.Join(ctx, &joinpoint.Config{
 		ServerAddr: "appbasic:appkey",
 		Provider:   xcloud.Default(),
-	}); err != nil {
+	})
+	if err != nil {
 		return
 	}
 
-	<-ctx.Done()
+	<-terminal.Context().Done()
 }
