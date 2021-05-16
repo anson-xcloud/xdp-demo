@@ -7,16 +7,16 @@ import (
 	"sync"
 	"time"
 
-	apipb "github.com/anson-xcloud/xdp-demo/api"
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/network"
+	"github.com/anson-xcloud/xdp-demo/xcloud/apis"
 	"google.golang.org/protobuf/proto"
 )
 
 var defaultServeMux = NewServeMux()
 
 type Request struct {
-	*apipb.Request
+	*apis.Request
 
 	pid uint32
 
@@ -60,7 +60,7 @@ func (r *ResponseWriter) Write(data interface{}) {
 		return
 	}
 
-	var req apipb.Response
+	var req apis.Response
 	req.Body = data.([]byte)
 	body, err := proto.Marshal(&req)
 	if err != nil {

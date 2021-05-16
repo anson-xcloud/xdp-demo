@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package apipb;
+package xcloudapis;
 
-option go_package = "github.com/anson-xcloud/xdp-demo/api";
+option go_package = "github.com/anson-xcloud/xdp-demo/xcloud/apis";
 
 message Peer {
   string sid = 1;

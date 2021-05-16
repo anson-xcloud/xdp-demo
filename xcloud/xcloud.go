@@ -14,12 +14,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/anson-xcloud/xdp-demo/api"
-	apipb "github.com/anson-xcloud/xdp-demo/api"
 	"github.com/anson-xcloud/xdp-demo/pkg/joinpoint"
 	"github.com/anson-xcloud/xdp-demo/pkg/network"
 	"github.com/anson-xcloud/xdp-demo/pkg/xlog"
 	"github.com/anson-xcloud/xdp-demo/statuscode"
+	"github.com/anson-xcloud/xdp-demo/xcloud/apis"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -75,7 +74,7 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 	}
 
 	transport := &Transport{conn: conn}
-	cresp, err := transport.call(ctx, "serivce.register", &apipb.ServiceRegisterRequest{
+	cresp, err := transport.call(ctx, "serivce.register", &apis.ServiceRegisterRequest{
 		Id:    ap.ID,
 		Rid:   int32(x.Rid),
 		Token: ap.Token,
@@ -86,7 +85,7 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 		return nil, nil, err
 	}
 
-	var resp apipb.ServiceRegisterResponse
+	var resp apis.ServiceRegisterResponse
 	if err := proto.Unmarshal(cresp.Body, &resp); err != nil {
 		conn.Close(err)
 		return nil, nil, err
@@ -122,7 +121,7 @@ func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 		return nil, ctx.Err()
 	}
 
-	var msg apipb.Request
+	var msg apis.Request
 	if err := proto.Unmarshal(p.Data, &msg); err != nil {
 		return nil, err
 	}
@@ -133,7 +132,7 @@ func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 	req.reqTime = time.Now()
 	req.pid = p.ID
 	if req.Source == nil {
-		req.Source = &api.Peer{}
+		req.Source = &apis.Peer{}
 	}
 	return &req, nil
 }
@@ -148,7 +147,7 @@ func pack(api string, pm proto.Message) (*network.Packet, error) {
 		return nil, err
 	}
 
-	var p apipb.Request
+	var p apis.Request
 	p.Api = api
 	p.Body = bs
 	pbs, err := proto.Marshal(&p)
@@ -161,7 +160,7 @@ func pack(api string, pm proto.Message) (*network.Packet, error) {
 	return &np, nil
 }
 
-func (t *Transport) call(ctx context.Context, cmd string, pm proto.Message) (*apipb.Response, error) {
+func (t *Transport) call(ctx context.Context, cmd string, pm proto.Message) (*apis.Response, error) {
 	np, err := pack(cmd, pm)
 	if err != nil {
 		return nil, err
@@ -172,7 +171,7 @@ func (t *Transport) call(ctx context.Context, cmd string, pm proto.Message) (*ap
 		return nil, err
 	}
 
-	var resp apipb.Response
+	var resp apis.Response
 	if err := proto.Unmarshal(rp.Data, &resp); err != nil {
 		return nil, err
 	}
@@ -241,12 +240,12 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 	return &ret.AccessPoint, nil
 }
 
-func (x *XCloud) Post(ctx context.Context, target *apipb.Peer, api string, headers map[string]string, body []byte) error {
+func (x *XCloud) Post(ctx context.Context, target *apis.Peer, api string, headers map[string]string, body []byte) error {
 	// if !x.isApiAllow(data.Api, pbs) {
 	// 	return ErrApiNowAllowed
 	// }
 
-	return x.transport.write(ctx, "xdp.post", &apipb.Request{
+	return x.transport.write(ctx, "xdp.post", &apis.Request{
 		Api:     api,
 		Target:  target,
 		Headers: headers,
@@ -266,9 +265,9 @@ func (x *XCloud) Post(ctx context.Context, target *apipb.Peer, api string, heade
 // 	// 	return ErrApiNowAllowed
 // 	// }
 
-// 	return x.transport.write(ctx, "xdp.multipost", &apipb.MultiMessage{
-// 		Remotes: ([]*apipb.Remote)(remotes),
-// 		Data:    (*apipb.Data)(data),
+// 	return x.transport.write(ctx, "xdp.multipost", &apis.MultiMessage{
+// 		Remotes: ([]*apis.Remote)(remotes),
+// 		Data:    (*apis.Data)(data),
 // 	})
 // }
 
@@ -277,9 +276,9 @@ func (x *XCloud) Get(ctx context.Context, appid, api string, headers map[string]
 	// 	return nil, ErrApiNowAllowed
 	// }
 
-	resp, err := x.transport.call(ctx, "xdp.get", &apipb.Request{
+	resp, err := x.transport.call(ctx, "xdp.get", &apis.Request{
 		Api:     api,
-		Target:  &apipb.Peer{Appid: appid},
+		Target:  &apis.Peer{Appid: appid},
 		Headers: headers,
 		Body:    body,
 	})
