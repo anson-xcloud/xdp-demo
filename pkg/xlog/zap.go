@@ -20,6 +20,14 @@ func NewZap() Logger {
 	return &zapLogger{SugaredLogger: sugar}
 }
 
+func Zap(l Logger) *zap.SugaredLogger {
+	z, ok := l.(*zapLogger)
+	if !ok {
+		return nil
+	}
+	return z.SugaredLogger
+}
+
 func (zl *zapLogger) With(fields ...interface{}) Logger {
 	sugar := zl.SugaredLogger.With(fields...)
 	return &zapLogger{SugaredLogger: sugar}

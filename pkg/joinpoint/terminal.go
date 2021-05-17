@@ -79,6 +79,12 @@ func (t *Terminal) joinWithRetry(ctx context.Context, addrs []string, nextRetry 
 		addr := addrs[i]
 		p, backups, err := t.connect(ctx, addr)
 		if err != nil {
+			if IsStatus(err, CodeUnauthenticated) {
+				t.logger.Errorf("[JOINPOINT] terminal stopped, read %s error: %s", addr, err)
+				t.cancel()
+				return
+			}
+
 			nextRetry = fnNextRetry(nextRetry)
 			t.logger.Warnf("[JOINPOINT] terminal wait for retry, connect %s error: %s", addr, err)
 			continue
@@ -91,12 +97,6 @@ func (t *Terminal) joinWithRetry(ctx context.Context, addrs []string, nextRetry 
 			eg, egCtx := errgroup.WithContext(ctx)
 			eg.Go(func() error { return t.read(egCtx, p, t.Opts.worker) })
 			if err := eg.Wait(); err != nil {
-				if IsStatus(err, CodeUnauthenticated) {
-					t.logger.Errorf("[JOINPOINT] terminal stopped, read %s error: %s", addr, err)
-					t.cancel()
-					return
-				}
-
 				t.logger.Warnf("[JOINPOINT] terminal wait for retry, read %s error: %s", addr, err)
 				nextRetry = fnNextRetry(nextRetry)
 				if nextRetry = nextRetry - time.Since(start); nextRetry < 0 {
