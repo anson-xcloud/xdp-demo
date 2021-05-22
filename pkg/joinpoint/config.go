@@ -1,22 +1,12 @@
 package joinpoint
 
-import (
-	"github.com/anson-xcloud/xdp-demo/pkg/xflag"
-)
-
 type Config struct {
-	ServerAddr string
+	ServerAddr string `xconf:"server_addr" xconfusage:"joinpoint server addr for connect"`
 
-	Provider Provider
+	Provider Provider `xconf:"-"`
 }
 
 func DefaultConfig() *Config {
 	c := &Config{}
 	return c
-}
-
-func (c *Config) Flags() *xflag.FlagSet {
-	fs := xflag.NewFlagSet()
-	fs.StringVar(&c.ServerAddr, "server_addr", "", "joinpoint server addr for connect")
-	return fs
 }

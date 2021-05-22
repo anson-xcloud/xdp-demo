@@ -37,7 +37,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour*24)
 	defer cancel()
 	terminal, err := joinpoint.Join(ctx, &joinpoint.Config{
-		ServerAddr: "appbasic:appkey",
+		ServerAddr: "appbasic:tokenbasic",
 		Provider:   xcloud.Default(),
 	})
 	if err != nil {

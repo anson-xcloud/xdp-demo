@@ -234,10 +234,14 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 	if err := json.Unmarshal(data, &ret); err != nil {
 		return nil, err
 	}
-	if ret.Code != statuscode.CodeOK {
+	switch ret.Code {
+	case statuscode.CodeOK:
+		return &ret.AccessPoint, nil
+	case 3:
+		return nil, joinpoint.StatusUnauthenticated
+	default:
 		return nil, &ret.Response
 	}
-	return &ret.AccessPoint, nil
 }
 
 func (x *XCloud) Post(ctx context.Context, target *apis.Peer, api string, headers map[string]string, body []byte) error {
