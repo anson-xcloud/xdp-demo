@@ -95,13 +95,12 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 	return x.transport, nil, nil
 }
 
-func (x *XCloud) Serve(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
+func (x *XCloud) Serve(ctx context.Context, jr joinpoint.Request) {
 	req := jr.(*Request)
-	req.rw = rw
 
 	h := x.sm.Get(req)
 	if h == nil {
-		rw.WriteStatus(joinpoint.NewStatus(100, ""))
+		req.ResponseStatus(joinpoint.NewStatus(100, ""))
 		return
 	}
 	h.Serve(ctx, req)

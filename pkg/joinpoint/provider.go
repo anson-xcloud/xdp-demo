@@ -9,23 +9,15 @@ type Transport interface {
 }
 
 type Request interface {
-	Discription() string
+	String() string
 
-	GetResponseWriter() ResponseWriter
-}
+	Response(interface{})
 
-type ResponseWriter interface {
-	Write(interface{})
-
-	WriteStatus(st *Status)
-}
-
-type Handler interface {
-	Serve(context.Context, ResponseWriter, Request)
+	ResponseStatus(st *Status)
 }
 
 type Provider interface {
-	Handler
-
 	Connect(ctx context.Context, addr string) (Transport, []string, error)
+
+	Serve(context.Context, Request)
 }

@@ -24,18 +24,12 @@ type Request struct {
 
 	t *Transport
 
-	rw joinpoint.ResponseWriter
-
 	// TODO
 	selfAppid string
 }
 
-func (r *Request) Discription() string {
+func (r *Request) String() string {
 	return fmt.Sprintf("%s", r.Api)
-}
-
-func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
-	return &ResponseWriter{r}
 }
 
 func (r *Request) GetHeader(key string) string {
@@ -44,18 +38,6 @@ func (r *Request) GetHeader(key string) string {
 }
 
 func (r *Request) Response(data interface{}) {
-	r.rw.Write(data)
-}
-
-func (r *Request) ResponseStatus(st *joinpoint.Status) {
-	r.rw.WriteStatus(st)
-}
-
-type ResponseWriter struct {
-	*Request
-}
-
-func (r *ResponseWriter) Write(data interface{}) {
 	if r.pid == 0 {
 		return
 	}
@@ -75,7 +57,7 @@ func (r *ResponseWriter) Write(data interface{}) {
 	r.t.writePacket(&p)
 }
 
-func (r *ResponseWriter) WriteStatus(st *joinpoint.Status) {
+func (r *Request) ResponseStatus(st *joinpoint.Status) {
 	if r.pid == 0 {
 		return
 	}

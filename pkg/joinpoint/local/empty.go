@@ -24,8 +24,8 @@ func (p *Provider) Connect(ctx context.Context, addr string) (joinpoint.Transpor
 	return &Transport{source: p.source}, nil, nil
 }
 
-func (p *Provider) Serve(ctx context.Context, rw joinpoint.ResponseWriter, jr joinpoint.Request) {
-	rw.WriteStatus(joinpoint.StatusOK)
+func (p *Provider) Serve(ctx context.Context, jr joinpoint.Request) {
+	jr.ResponseStatus(joinpoint.StatusOK)
 }
 
 type Transport struct {

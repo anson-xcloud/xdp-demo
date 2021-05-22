@@ -118,19 +118,18 @@ func (t *Terminal) read(ctx context.Context, p Transport, worker Worker) error {
 			return err
 		}
 
+		st := time.Now()
 		worker.Run(func() {
-			st := time.Now()
 			defer func() {
-				t.logger.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.Discription(), time.Since(st).Seconds())
+				t.logger.Debugf("[JOINPOINT] terminal serve %s cost %.3fs", req.String(), time.Since(st).Seconds())
 			}()
 
-			rw := req.GetResponseWriter()
 			if t.Opts.MaxHandlerTime != 0 {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithTimeout(ctx, t.Opts.MaxHandlerTime)
 				defer cancel()
 			}
-			t.Provider.Serve(ctx, rw, req)
+			t.Provider.Serve(ctx, req)
 		})
 	}
 }

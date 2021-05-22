@@ -27,22 +27,14 @@ func NewEvent() *Request {
 	return &Request{ID: id, ch: make(chan error)}
 }
 
-func (r *Request) Discription() string {
+func (r *Request) String() string {
 	return strconv.FormatInt(int64(r.ID), 10)
 }
 
-func (r *Request) GetResponseWriter() joinpoint.ResponseWriter {
-	return &ResponseWriter{ev: r}
+func (r *Request) Response(interface{}) {
+	r.ch <- nil
 }
 
-type ResponseWriter struct {
-	ev *Request
-}
-
-func (r *ResponseWriter) Write(interface{}) {
-	r.ev.ch <- nil
-}
-
-func (r *ResponseWriter) WriteStatus(st *joinpoint.Status) {
-	r.ev.ch <- st
+func (r *Request) ResponseStatus(st *joinpoint.Status) {
+	r.ch <- st
 }
