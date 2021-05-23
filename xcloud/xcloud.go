@@ -27,7 +27,7 @@ type XCloud struct {
 
 	logger xlog.Logger
 
-	sm *ServeMux
+	handler Handler
 
 	transport *Transport
 
@@ -35,13 +35,12 @@ type XCloud struct {
 }
 
 func Default() *XCloud {
-	xc, _ := New(DefaultConfig())
-	return xc
+	return New(DefaultConfig())
 }
 
-func New(c *Config) (*XCloud, error) {
+func New(c *Config) *XCloud {
 	if len(c.Env.XcloudAddrs) == 0 {
-		return nil, errors.New("no server support")
+		panic("no server support")
 	}
 
 	addrs := list.New()
@@ -52,8 +51,8 @@ func New(c *Config) (*XCloud, error) {
 	return &XCloud{
 		serverAddrs: addrs,
 		logger:      c.Logger,
-		sm:          c.Handler,
-	}, nil
+		handler:     c.Handler,
+	}
 }
 
 func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport, []string, error) {
@@ -96,14 +95,7 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 }
 
 func (x *XCloud) Serve(ctx context.Context, jr joinpoint.Request) {
-	req := jr.(*Request)
-
-	h := x.sm.Get(req)
-	if h == nil {
-		req.ResponseStatus(joinpoint.NewStatus(100, ""))
-		return
-	}
-	h.Serve(ctx, req)
+	x.handler.Serve(ctx, jr.(*Request))
 }
 
 type Transport struct {
@@ -206,6 +198,9 @@ func (x *XCloud) getAccessPoint(addr *Address) (*AccessPoint, error) {
 	values.Set("timestamp", strconv.FormatInt(time.Now().Unix(), 10))
 	signURL(addr.AppSecret, values)
 
+	if x.serverAddrs.Len() == 0 {
+		return nil, errors.New("no server")
+	}
 	it := x.serverAddrs.Front()
 	x.serverAddrs.Remove(it)
 	x.serverAddrs.PushBack(it.Value)

@@ -34,7 +34,7 @@ type Config struct {
 
 	Logger xlog.Logger
 
-	Handler *ServeMux
+	Handler Handler
 }
 
 func DefaultConfig() *Config {

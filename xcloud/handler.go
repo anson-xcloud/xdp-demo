@@ -233,6 +233,15 @@ func (s *ServeMux) Get(req *Request) Handler {
 	return nil
 }
 
+func (s *ServeMux) Serve(ctx context.Context, req *Request) {
+	h := s.Get(req)
+	if h == nil {
+		req.ResponseStatus(joinpoint.NewStatus(100, ""))
+		return
+	}
+	h.Serve(ctx, req)
+}
+
 // HandleFunc call defaultServeMux.HandleFunc
 func HandleFunc(remote HandlerRemote, api string, h HandlerFunc) {
 	defaultServeMux.HandleFunc(remote, api, h)

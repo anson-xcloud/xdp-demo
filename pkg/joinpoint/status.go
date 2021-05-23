@@ -21,6 +21,7 @@ var (
 
 var (
 	StatusOK              = NewStatus(CodeOK, "ok")
+	StatusUnkown          = NewStatus(CodeUnkown, "error")
 	StatusUnauthenticated = NewStatus(CodeUnauthenticated, "Unauthenticated")
 )
 
