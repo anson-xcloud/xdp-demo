@@ -56,6 +56,10 @@ func (t *Terminal) Context() context.Context {
 	return t.ctx
 }
 
+func (t *Terminal) Stop() {
+	t.cancel()
+}
+
 func (t *Terminal) joinWithRetry(ctx context.Context, addrs []string, nextRetry time.Duration) {
 	if len(addrs) == 0 {
 		return
