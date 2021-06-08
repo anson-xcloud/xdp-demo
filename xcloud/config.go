@@ -73,13 +73,13 @@ var (
 		},
 	}
 
-	EnvDev     = getEnv(EnvDevDiscription)
-	EnvDebug   = getEnv(EnvDebugDiscription)
-	EnvRelease = getEnv(EnvReleaseDiscription)
+	EnvDev     = GetEnv(EnvDevDiscription)
+	EnvDebug   = GetEnv(EnvDebugDiscription)
+	EnvRelease = GetEnv(EnvReleaseDiscription)
 	EnvDefault = EnvRelease
 )
 
-func getEnv(env string) EnvConfig {
+func GetEnv(env string) EnvConfig {
 	c, ok := enves[env]
 	// debug.PanicIf(ok, "")
 	if !ok {
@@ -90,5 +90,5 @@ func getEnv(env string) EnvConfig {
 }
 
 func SetEnv(env string) {
-	EnvDefault = getEnv(env)
+	EnvDefault = GetEnv(env)
 }

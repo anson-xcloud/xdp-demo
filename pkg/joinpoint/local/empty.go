@@ -43,3 +43,11 @@ func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 		return nil, errors.New("done")
 	}
 }
+
+func (t *Transport) Get(ctx context.Context, data interface{}) ([]byte, error) {
+	return nil, errors.New("unimplement")
+}
+
+func (t *Transport) Send(ctx context.Context, data interface{}) error {
+	return errors.New("unimplement")
+}

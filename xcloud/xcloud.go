@@ -128,6 +128,14 @@ func (t *Transport) Recv(ctx context.Context) (joinpoint.Request, error) {
 	return &req, nil
 }
 
+func (t *Transport) Get(ctx context.Context, data interface{}) ([]byte, error) {
+	return nil, errors.New("unimplement")
+}
+
+func (t *Transport) Send(ctx context.Context, data interface{}) error {
+	return errors.New("unimplement")
+}
+
 func (t *Transport) writePacket(packet *network.Packet) error {
 	return t.conn.Write(packet)
 }
