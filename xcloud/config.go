@@ -35,6 +35,8 @@ type Config struct {
 	Logger xlog.Logger
 
 	Handler Handler
+
+	Agent bool
 }
 
 func DefaultConfig() *Config {

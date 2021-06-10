@@ -31,7 +31,8 @@ type XCloud struct {
 
 	transport *Transport
 
-	Rid int // runtime id
+	Rid   int // runtime id
+	Agent bool
 }
 
 func Default() *XCloud {
@@ -52,6 +53,7 @@ func New(c *Config) *XCloud {
 		serverAddrs: addrs,
 		logger:      c.Logger,
 		handler:     c.Handler,
+		Agent:       c.Agent,
 	}
 }
 
@@ -76,6 +78,7 @@ func (x *XCloud) Connect(ctx context.Context, addr string) (joinpoint.Transport,
 	cresp, err := transport.call(ctx, "serivce.register", &apis.ServiceRegisterRequest{
 		Id:    ap.ID,
 		Rid:   int32(x.Rid),
+		Agent: x.Agent,
 		Token: ap.Token,
 		// Config: x.opts.Config,
 	})
