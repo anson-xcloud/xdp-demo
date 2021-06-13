@@ -43,7 +43,16 @@ func (r *Request) Response(data interface{}) {
 	}
 
 	var req apis.Response
-	req.Body = data.([]byte)
+
+	switch rd := data.(type) {
+	case []byte:
+		req.Body = rd
+	case string:
+		req.Body = []byte(rd)
+	default:
+		panic("unsupport response type")
+	}
+
 	body, err := proto.Marshal(&req)
 	if err != nil {
 		// TODO writestatus
